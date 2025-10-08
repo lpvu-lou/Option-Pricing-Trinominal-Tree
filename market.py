@@ -50,3 +50,10 @@ class Market:
             if t_i < t_div <= t_ip1 + tol:
                 total_div += policy.amount(t_div, S, self.S0)
         return total_div
+
+    def has_dividend_between(self, t_i, t_ip1):
+        tol = (t_ip1 - t_i) / 1000 if t_ip1 > t_i else 1e-12
+        for t_div, _ in self.dividends:
+            if t_i < t_div <= t_ip1 + tol:
+                return True
+        return False
