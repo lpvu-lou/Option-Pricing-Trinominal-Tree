@@ -84,7 +84,7 @@ def outil_convergence(market: Market, option: Option, N_values, exercise="europe
 
 if __name__ == "__main__":
     # Paramètres du marché et de l’option
-    market = Market(S0=100, r=0.05, sigma=0.2, T=0.5, dividends=None)
+    market = Market(S0=100, r=0.05, sigma=0.25, T=0.5, dividends=None)
     option = Option(K=90, is_call=False)
 
     # Valeurs de N à tester
