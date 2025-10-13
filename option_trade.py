@@ -3,7 +3,6 @@ from dataclasses import dataclass
 @dataclass
 class Option:
     K: float
-    T: float
     is_call: bool = True
 
     def payoff(self, S):

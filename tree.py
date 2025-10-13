@@ -4,7 +4,7 @@ from option_trade import Option
 
 class TrinomialTree:
     """
-    Arbre trinomial simplifié pour le pricing d’options européennes et américaines.
+    Arbre trinomial pour le pricing d’options européennes et américaines.
     """
 
     def __init__(self, market, option: Option, N: int, exercise="european"):
@@ -61,17 +61,13 @@ class TrinomialTree:
         E = S_i_k * math.exp(self.r * self.dt) - div
         Var = (S_i_k ** 2) * math.exp(2 * self.r * self.dt) * (self.exp_sig2_dt - 1)
 
+        a = self.alpha
+        a2 = a * a
+
         # Nœud médian du prochain niveau
         base_next = self.trunk[i + 1]
-        ratio = E / base_next if base_next != 0 else 1.0
-        if ratio <= 0 or not math.isfinite(ratio):
-            # dividende trop élevé
-            kprime = 0
-            S_mid = base_next
-        else:
-            kprime = int(round(math.log(ratio) / math.log(self.alpha)))
-            S_mid = base_next * (self.alpha ** kprime)
-
+        kprime = int(round(math.log(E/base_next) / math.log(a)))
+        S_mid = base_next * (a ** kprime)
         S_up, S_down = S_mid * self.alpha, S_mid / self.alpha
 
         # Correction si E hors de l’intervalle
@@ -85,26 +81,29 @@ class TrinomialTree:
         S_up, S_down = S_mid * self.alpha, S_mid / self.alpha
 
         # Cas simple : E ≈ S_mid
-        if abs(S_mid - E) <= 1e-12:
-            denom = (1 - self.alpha) * (1 / self.alpha**2 - 1)
-            p_down = (self.exp_sig2_dt - 1) / denom
-            p_up = p_down / self.alpha
+        if not self.market.has_dividend_between(t_i, t_ip1):
+            p_down = (self.exp_sig2_dt - 1) / ((1 - a) * ((1 / a2) - 1))
+            p_up = p_down / a
             p_mid = 1 - p_up - p_down
         else:
-            # Cas général
-            a, a_inv = self.alpha, 1 / self.alpha
-            Ehat = E / S_mid
-            M2hat = (Var + E**2) / (S_mid**2)
-
-            b1, b2 = a**2 - a, a_inv**2 - a_inv
-            d1, d2 = a - 1, a_inv - 1
-            c1, c2 = M2hat - Ehat, Ehat - 1
-            det = b1 * d2 - b2 * d1
-
-            p_up = (c1 * d2 - b2 * c2) / det
-            p_down = (b1 * c2 - c1 * d1) / det
+            # General case with dividend
+            num = (1 / (S_mid ** 2)) * (V + E ** 2) - 1 - (a + 1) * ((E / S_mid) - 1)
+            den = (1 - a) * ((1 / (a2)) - 1)
+            p_down = num / den
+            p_up = ((E / S_mid) - 1 - ((1 / a) - 1) * p_down) / (a - 1)
             p_mid = 1 - p_up - p_down
 
+        # Correction numérique
+        p_down = max(0.0, min(1.0, p_down))
+        p_up = max(0.0, min(1.0, p_up))
+        p_mid = max(0.0, min(1.0, 1 - p_up - p_down))
+
+        total = p_down + p_mid + p_up
+        if abs(total - 1) > 1e-12:
+            p_down /= total
+            p_mid /= total
+            p_up /= total
+        
         return p_down, p_mid, p_up, int(kprime)
 
     # PROBABILITÉS D’ATTEINTE
@@ -177,15 +176,20 @@ class TrinomialTree:
 
     # PRICING BACKWARD
     def price_backward(self):
-        """Prix de l’option par récurrence arrière"""
+        """
+        Prix de l’option par récurrence arrière
+        """
         # Payoffs à maturité
         for node in self.tree[-1]:
-            node.option_value = self.option.payoff(node.stock_price)
+            if node is not None:
+                node.option_value = self.option.payoff(node.stock_price)
 
         # Remontée
         for i in range(self.N - 1, -1, -1):
             next_level = self.tree[i + 1]
             for j, node in enumerate(self.tree[i]):
+                if node is None:
+                    continue
                 S = node.stock_price
                 pD, pM, pU, kprime = self._probabilities(i, j - i, S)
                 base = kprime + (i + 1)
@@ -203,7 +207,9 @@ class TrinomialTree:
 
     # PRICING RÉCURSIF
     def price_recursive(self, i=0, k=0):
-        """Calcul récursif du prix de l’option."""
+        """
+        Calcul récursif du prix de l’option
+        """
         if i == self.N:
             return self.option.payoff(self.tree[i][k + i].stock_price)
 
