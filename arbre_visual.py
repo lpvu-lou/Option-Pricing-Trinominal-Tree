@@ -51,18 +51,27 @@ def compare_and_display_in_excel(market, option, N):
         """
         Transforme l’arbre pour affichage vertical dans Excel
         """
-        n = len(tree.tree)
+        n_levels = len(tree.tree)
         max_nodes = max(len(level) for level in tree.tree)
-        matrix = [[""] * n for _ in range(2 * n + 1)]  
-        center_row = n  
 
-        for i, level in enumerate(tree.tree): 
-            offset = len(level) / 2
+        total_rows = 2 * max_nodes + 1
+        matrix = [[""] * n_levels for _ in range(total_rows)]
+        center_row = total_rows // 2  
+
+        for i, level in enumerate(tree.tree):
+            n_nodes = len(level)
+    
+            start_row = center_row - (n_nodes // 2)
             for j, node in enumerate(level):
-                if node:
-                    value = getattr(node, attr)
-                    row = center_row - (j - offset)
-                    matrix[row][i] = round(value, 6)
+                if not node:
+                    continue
+                value = getattr(node, attr)
+            try:
+                matrix[start_row + j][i] = round(value, 6) if isinstance(value, (int, float)) else value
+            except IndexError:
+                matrix.append([""] * n_levels)
+                matrix[start_row + j][i] = round(value, 6) if isinstance(value, (int, float)) else value
+
         return matrix
 
     # Arbre des prix du sous-jacent 
