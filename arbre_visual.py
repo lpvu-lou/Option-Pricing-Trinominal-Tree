@@ -9,11 +9,11 @@ def compare_and_display_in_excel(market, option, N):
 
     # --- Ouvrir le fichier Excel ---
     wb = xw.Book('/Users/lanphuongvu/Downloads/Option-Pricing-main/TrinomialAndBS_Pricer_V2.xlsm')
-    sheet_prices = wb.sheets["Stock Prices"]
-    sheet_reach = wb.sheets["Reach Probabilities"]
-    sheet_eu = wb.sheets["European Option"]
-    sheet_us = wb.sheets["American Option"]
-    sheet_frontier = wb.sheets["Exercise Frontier"]
+    sheet_prices = wb.sheets["Arbre Stock"]
+    sheet_reach = wb.sheets["Arbre Proba"]
+    sheet_eu = wb.sheets["Arbre EU"]
+    sheet_us = wb.sheets["Arbre US"]
+    sheet_frontier = wb.sheets["Exercice Frontier"]
 
     # --- Nettoyage des feuilles ---
     for sh in [sheet_prices, sheet_reach, sheet_eu, sheet_us, sheet_frontier]:
@@ -92,7 +92,7 @@ def compare_and_display_in_excel(market, option, N):
         data_range = sheet_frontier.range("A1").expand()
 
     # Set chart type explicitly (XY Scatter)
-        chart.chart_type = "xy_scatter_lines"
+        chart.chart_type = "xy_scatter_smooth_no_markers"
         chart.set_source_data(data_range)
         chart.name = "Exercise Frontier"
 

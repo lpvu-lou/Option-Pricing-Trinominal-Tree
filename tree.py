@@ -93,11 +93,7 @@ class TrinomialTree:
             p_up = ((E / S_mid) - 1 - ((1 / a) - 1) * p_down) / (a - 1)
             p_mid = 1 - p_up - p_down
 
-        # Correction numérique
-        p_down = max(0.0, min(1.0, p_down))
-        p_up = max(0.0, min(1.0, p_up))
-        p_mid = max(0.0, min(1.0, 1 - p_up - p_down))
-
+    
         total = p_down + p_mid + p_up
         if abs(total - 1) > 1e-12:
             p_down /= total
