@@ -98,5 +98,5 @@ def outil_convergence_excel(market: Market, option: Option, N_values, exercise="
 if __name__ == "__main__":
     market = Market(S0=100, r=0.05, sigma=0.25, T=0.5, dividends=None)
     option = Option(K=90, is_call=False)
-    N_values = list(range(1, 401))
+    N_values = list(range(1, 201))
     outil_convergence_excel(market, option, N_values)

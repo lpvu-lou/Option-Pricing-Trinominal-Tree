@@ -5,36 +5,23 @@ from tree import TrinomialTree
 
 
 def compare_and_display_in_excel(market, option, N):
-    """
-    Affiche les arbres sous forme triangulaire verticale dans Excel et trace la frontière d’exercice pour une option américaine.
-    """
+    """Affiche les arbres sous forme triangulaire verticale dans Excel."""
 
-    # Ouvrir le fichier Excel 
+    # --- Ouvrir le fichier Excel ---
     wb = xw.Book('/Users/lanphuongvu/Downloads/Option-Pricing-main/TrinomialAndBS_Pricer_V2.xlsm')
-    # check if sheet exists, otherwise create it
-    if "Stock Prices" not in [sh.name for sh in wb.sheets]:
-        wb.sheets.add("Stock Prices")
-    if "Reach Probabilities" not in [sh.name for sh in wb.sheets]:
-        wb.sheets.add("Reach Probabilities")
-    if "European Option" not in [sh.name for sh in wb.sheets]:
-        wb.sheets.add("European Option")
-    if "American Option" not in [sh.name for sh in wb.sheets]:
-        wb.sheets.add("American Option")
-    if "Exercise Frontier" not in [sh.name for sh in wb.sheets]:
-        wb.sheets.add("Exercise Frontier")
     sheet_prices = wb.sheets["Stock Prices"]
     sheet_reach = wb.sheets["Reach Probabilities"]
     sheet_eu = wb.sheets["European Option"]
     sheet_us = wb.sheets["American Option"]
     sheet_frontier = wb.sheets["Exercise Frontier"]
 
-    # Nettoyage des feuilles
+    # --- Nettoyage des feuilles ---
     for sh in [sheet_prices, sheet_reach, sheet_eu, sheet_us, sheet_frontier]:
         sh.clear_contents()
         for chart in sh.charts:
             chart.delete()
 
-    # Construction des arbres EU et US
+    # --- Construction des arbres ---
     tree_eu = TrinomialTree(market, option, N, exercise="european")
     tree_us = TrinomialTree(market, option, N, exercise="american")
 
@@ -46,39 +33,27 @@ def compare_and_display_in_excel(market, option, N):
     price_eu = tree_eu.tree[0][0].option_value
     price_us = tree_us.tree[0][0].option_value
 
-    # Fonction utilitaire pour transformer l’arbre en matrice pour affichage
+    # --- Helper pour format vertical (colonne = step, ligne = état) ---
     def vertical_tree(tree, attr):
-        """
-        Transforme l’arbre pour affichage vertical dans Excel
-        """
-        n_levels = len(tree.tree)
+        """Transforme l’arbre pour affichage vertical dans Excel."""
+        n = len(tree.tree)
         max_nodes = max(len(level) for level in tree.tree)
+        matrix = [[""] * n for _ in range(2 * n + 1)]  # grille vide (plus grande pour centrer)
+        center_row = n  # centre vertical
 
-        total_rows = 2 * max_nodes + 1
-        matrix = [[""] * n_levels for _ in range(total_rows)]
-        center_row = total_rows // 2  
-
-        for i, level in enumerate(tree.tree):
-            n_nodes = len(level)
-    
-            start_row = center_row - (n_nodes // 2)
+        for i, level in enumerate(tree.tree):  # i = colonne
+            offset = len(level) // 2
             for j, node in enumerate(level):
-                if not node:
-                    continue
-                value = getattr(node, attr)
-            try:
-                matrix[start_row + j][i] = round(value, 6) if isinstance(value, (int, float)) else value
-            except IndexError:
-                matrix.append([""] * n_levels)
-                matrix[start_row + j][i] = round(value, 6) if isinstance(value, (int, float)) else value
-
+                if node:
+                    value = getattr(node, attr)
+                    row = center_row - (j - offset)
+                    matrix[row][i] = round(value, 6)
         return matrix
 
-    # Arbre des prix du sous-jacent 
+    # --- Arbre des prix du sous-jacent ---
     sheet_prices.range("A1").value = "Stock Price Tree"
     stock_matrix = vertical_tree(tree_us, "stock_price")
     sheet_prices.range("A2").value = stock_matrix
-    sheet_prices.range("A1").value = ["Step"] + list(range(N + 1))
 
     # --- Arbre des probabilités d’atteinte ---
     sheet_reach.range("A1").value = "Reach Probability Tree"
@@ -131,6 +106,7 @@ def compare_and_display_in_excel(market, option, N):
         sh.range("A:ZZ").columns.autofit()
         sh.range("A:ZZ").api.HorizontalAlignment = -4108  # centré
 
+    print("\n✅ Vertical trinomial trees exported successfully.")
     print(f"European price = {price_eu:.4f}")
     print(f"American price = {price_us:.4f}")
     print(f"Difference     = {price_us - price_eu:.4f}")
@@ -138,10 +114,10 @@ def compare_and_display_in_excel(market, option, N):
 
 if __name__ == "__main__":
     S0 = 100
-    K = 102
+    K = 90
     r = 0.05
-    sigma = 0.3
-    T = 0.25
+    sigma = 0.25
+    T = 0.5
     N = 100
 
     market = Market(S0=S0, r=r, sigma=sigma, T=T, dividends=[])
