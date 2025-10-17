@@ -85,12 +85,16 @@ def backward_pricing(market, option, N, exercise, optimize, threshold):
     return tree.tree[0][0].option_value, elapsed, tree
 
 
-def recursive_pricing(market, option, N, exercise):
+def recursive_pricing(market, option, N, exercise, optimize, threshold):
     """Prix de l’option par la méthode récursive."""
     start = time.time()
 
     tree = TrinomialTree(market, option, N, exercise)
     tree.build_tree()
+
+    if optimize == "Oui":
+        tree.prune_tree(threshold, inplace=True)
+
     price = tree.price_recursive()
 
     elapsed = time.time() - start
@@ -113,7 +117,7 @@ def run_pricer():
     if method == "Backward":
         price, elapsed, tree = backward_pricing(market, option, N, exercise, optimize, threshold)
     else:
-        price, elapsed, tree = recursive_pricing(market, option, N, exercise)
+        price, elapsed, tree = recursive_pricing(market, option, N, exercise, optimize, threshold)
 
     # --- Calcul du prix Black-Scholes ---
     if (not exdivdate) and (exercise == "european"):
