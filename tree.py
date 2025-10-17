@@ -59,7 +59,7 @@ class TrinomialTree:
 
         # Espérance et variance
         E = S_i_k * math.exp(self.r * self.dt) - div
-        Var = (S_i_k ** 2) * math.exp(2 * self.r * self.dt) * (self.exp_sig2_dt - 1)
+        V = (S_i_k ** 2) * math.exp(2 * self.r * self.dt) * (self.exp_sig2_dt - 1)
 
         a = self.alpha
         a2 = a * a
