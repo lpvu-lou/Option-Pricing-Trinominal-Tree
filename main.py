@@ -1,12 +1,12 @@
 # Recuperer des donnees dans un Excel et utiliser ces donnees pour faire des calculs en utilisant xlwings
 import xlwings as xw
-from market import Market
-from option_trade import Option
-from tree import TrinomialTree
+from models.market import Market
+from models.option_trade import Option
+from models.tree import TrinomialTree
 import math
 import numpy as np
-from blackscholes import bs_price
-from node import Node
+from utils.utils_bs import bs_price
+from models.node import Node
 import time
 import datetime as dt
 import warnings

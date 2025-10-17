@@ -4,9 +4,7 @@ from core_pricer import input_parameters, run_pricer as core_run_pricer
 
 
 def display_trees(wb, tree, show_stock, show_reach, show_option):
-    """
-    Affiche les arbres dans des feuilles séparées
-    """
+    """Affiche les arbres dans des feuilles séparées"""
 
     def ensure_sheet(name):
         """Retourne la feuille si elle existe, sinon la crée."""
@@ -35,8 +33,9 @@ def display_trees(wb, tree, show_stock, show_reach, show_option):
                     matrix[row][i] = round(value, 6)
         return matrix
 
-    def write_tree(sheet, matrix):
+    def write_tree(sheet, title, matrix):
         sheet.clear_contents()
+        sheet.range("A1").value = title
         sheet.range("A2").value = matrix
         sheet.range("A:ZZ").columns.autofit()
         sheet.range("A:ZZ").api.HorizontalAlignment = -4108  # centré
@@ -45,30 +44,39 @@ def display_trees(wb, tree, show_stock, show_reach, show_option):
     if show_stock:
         sht_stock = ensure_sheet("Arbre Stock")
         stock_matrix = vertical_tree(tree, "stock_price")
-        write_tree(sht_stock, "", stock_matrix)
+        write_tree(sht_stock, "Stock Price Tree", stock_matrix)
 
     if show_option:
         sht_option = ensure_sheet("Arbre Option")
         option_matrix = vertical_tree(tree, "option_value")
-        write_tree(sht_option, option_matrix)
+        write_tree(sht_option, "Option Value Tree", option_matrix)
 
     if show_reach:
         sht_reach = ensure_sheet("Arbre Proba")
         reach_matrix = vertical_tree(tree, "p_reach")
-        write_tree(sht_reach, reach_matrix)
+        write_tree(sht_reach, "Reach Probability Tree", reach_matrix)
 
 @xw.sub
 def run_pricer():
     """Fonction principale appelée par le bouton 'PRICER' dans Excel."""
-    wb = xw.Book('/Users/lanphuongvu/Downloads/Option-Pricing-main 2/TrinomialAndBS_Pricer_V2.xlsm')
 
     # Lecture des paramètres dans Excel
-    (market, option, N, exercise, method, optimize, threshold, arbre_stock, arbre_proba, arbre_option, sheet, S0, K, r, sigma, T, is_call) = input_parameters()
-
-    core_run_pricer()
-
+    (market, option, N, exercise, method, optimize, threshold, arbre_stock, arbre_proba, arbre_option, wb, sheet, S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
+    
     # Calcul des prix via core_pricer.run_pricer()
     results = core_run_pricer()
+
+    sheet.range('Prix_Tree').value = results['tree_price']
+    sheet.range('Prix_Tree').number_format = '0.0000'
+
+    sheet.range('Time_Tree').value = results['tree_time']
+    sheet.range('Time_Tree').number_format = '0.000000'
+
+    sheet.range('Prix_BS').value = results['bs_price']
+    sheet.range('Prix_BS').number_format = '0.0000'
+
+    sheet.range('Time_BS').value = results['bs_time']
+    sheet.range('Time_BS').number_format = '0.000000'
 
     # Affichage des arbres si demandé
     display_trees(
@@ -81,3 +89,6 @@ def run_pricer():
 
     # Sauvegarde du fichier Excel
     wb.save()
+
+if __name__ == '__main__':
+    run_pricer()

@@ -1,7 +1,7 @@
 import streamlit as st
-from market import Market, DividendPolicy
-from option_trade import Option
-from tree import TrinomialTree
+from models.market import Market, DividendPolicy
+from models.option_trade import Option
+from models.tree import TrinomialTree
 
 st.set_page_config(page_title="Trinomial Tree Option Pricer", page_icon="📈")
 

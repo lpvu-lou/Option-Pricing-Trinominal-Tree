@@ -4,9 +4,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import math
 import pytest
 import numpy as np
-from node import Node
-from option_trade import Option
-from tree import TrinomialTree
+from models.node import Node
+from models.option_trade import Option
+from models.tree import TrinomialTree
 
 class DummyMarket:
     def __init__(self, S0=100, r=0.02, sigma=0.2, T=1.0):
