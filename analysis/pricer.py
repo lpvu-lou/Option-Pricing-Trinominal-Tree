@@ -1,13 +1,21 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import xlwings as xw
 import numpy as np
 from core_pricer import input_parameters, run_pricer as core_run_pricer
 
 
 def display_trees(wb, tree, show_stock, show_reach, show_option):
-    """Affiche les arbres dans des feuilles séparées"""
+    """
+    Affiche les arbres dans des feuilles séparées
+    """
 
     def ensure_sheet(name):
-        """Retourne la feuille si elle existe, sinon la crée."""
+        """
+        Retourne la feuille si elle existe, sinon la crée
+        """
         try:
             return wb.sheets[name]
         except Exception:
@@ -58,7 +66,9 @@ def display_trees(wb, tree, show_stock, show_reach, show_option):
 
 @xw.sub
 def run_pricer():
-    """Fonction principale appelée par le bouton 'PRICER' dans Excel."""
+    """
+    Fonction principale appelée par le bouton 'PRICER' dans Excel
+    """
 
     # Lecture des paramètres dans Excel
     (market, option, N, exercise, method, optimize, threshold, arbre_stock, arbre_proba, arbre_option, wb, sheet, S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()

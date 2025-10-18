@@ -12,13 +12,15 @@ from models.node import Node
 from utils.utils_date import datetime_to_years 
 
 def input_parameters():
-    """Lit les paramètres du pricer depuis Excel."""
+    """
+    Lit les paramètres du pricer depuis Excel
+    """
     
     # Ouvre le fichier Excel
     wb = xw.Book('/Users/lanphuongvu/Downloads/Option-Pricing-main 2/TrinomialAndBS_Pricer_V2.xlsm')
     sheet = wb.sheets['Paramètres']
 
-    # ====== Paramètres du marché ======
+    # Paramètres du marché
     S0 = float(sheet.range('Spot').value)
     r = sheet.range('Taux').value
     sigma = sheet.range('Volatilité').value
@@ -26,30 +28,30 @@ def input_parameters():
     lam = sheet.range('Lambda').value
     exdiv_raw = sheet.range('ExDivDate_Dividende').value
 
-    # ====== Paramètres de l’option ======
+    # Paramètres de l’option
     K = sheet.range('Strike').value
     maturity_date = sheet.range('Maturité').value
     pricing_date = sheet.range('date_pricing').value
     is_call = (sheet.range('Call_Put').value == "Call")
     exercise = "european" if sheet.range('Exercice').value == "EU" else "american"
 
-    # ====== Paramètres de l’arbre ======
+    # Paramètres de l’arbre
     N = int(sheet.range('N').value)
     method = sheet.range('Methode_Pricing').value
     optimize = sheet.range('Pruning').value
     threshold = sheet.range('seuil').value
 
-    # ====== Options d’affichage ======
+    # Options d’affichage
     arbre_stock = sheet.range('AffichageStock').value
     arbre_proba = sheet.range('AffichageReach').value
     arbre_option = sheet.range('AffichageOption').value
 
-    # ====== Conversion des dates ======
+    # Conversion des dates
     # Convertir la maturité et les ex-div en temps (années)
     T = datetime_to_years(maturity_date, pricing_date)
     exdivdate = datetime_to_years(exdiv_raw, pricing_date)
 
-    # ====== Création du marché et de l’option ======
+    # Création du marché et de l’option
     market = Market(
         S0=S0,
         r=r,
@@ -69,40 +71,39 @@ def input_parameters():
             S0, K, r, sigma, T, is_call, exdivdate)
 
 def backward_pricing(market, option, N, exercise, optimize, threshold):
-    """Prix de l’option par la méthode backward."""
+    """
+    Prix de l’option par la méthode backward
+    """
     start = time.time()
-
     tree = TrinomialTree(market, option, N, exercise)
     tree.build_tree()
-
-    if optimize == "Oui":
-        tree.prune_tree(threshold, inplace=True)
-
     tree.compute_reach_probabilities()
+    if optimize == "Oui":
+        tree.prune_tree(threshold)
     tree.price_backward()
-
     elapsed = time.time() - start
     return tree.tree[0][0].option_value, elapsed, tree
 
 
 def recursive_pricing(market, option, N, exercise, optimize, threshold):
-    """Prix de l’option par la méthode récursive."""
+    """
+    Prix de l’option par la méthode récursive
+    """
     start = time.time()
-
     tree = TrinomialTree(market, option, N, exercise)
     tree.build_tree()
-
+    tree.compute_reach_probabilities()
     if optimize == "Oui":
-        tree.prune_tree(threshold, inplace=True)
-
+        tree.prune_tree(threshold)
     price = tree.price_recursive()
-
     elapsed = time.time() - start
     return price, elapsed, tree
 
 
 def black_scholes_price(S0, K, r, sigma, T, is_call):
-    """Prix Black-Scholes (sans dividendes discrets)."""
+    """
+    Prix Black-Scholes (sans dividendes)
+    """
     start = time.time()
     price = bs_price(S0, K, r, sigma, T, is_call)
     elapsed = time.time() - start
@@ -113,13 +114,13 @@ def run_pricer():
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
      S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
 
-    # --- Sélection de la méthode ---
+    # Sélection de la méthode
     if method == "Backward":
         price, elapsed, tree = backward_pricing(market, option, N, exercise, optimize, threshold)
     else:
         price, elapsed, tree = recursive_pricing(market, option, N, exercise, optimize, threshold)
 
-    # --- Calcul du prix Black-Scholes ---
+    # Calcul du prix Black-Scholes
     if (not exdivdate) and (exercise == "european"):
         bs_val, bs_time = black_scholes_price(S0, K, r, sigma, T, is_call)
     else:

@@ -19,7 +19,7 @@ def outil_convergence_excel():
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
      S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
     
-    # si la feuille n'existe pas, la créer
+    # Si la feuille n'existe pas, la créer
     if "Test Convergence" not in [sh.name for sh in wb.sheets]:
         wb.sheets.add("Test Convergence")
     sheet_cv = wb.sheets['Test Convergence']
@@ -31,7 +31,7 @@ def outil_convergence_excel():
     # Calcul des prix et erreurs
     bs_val, _ = black_scholes_price(S0, K, r, sigma, T, is_call)
     
-    N_values = list(range(1, N))
+    N_values = list(range(1, N+1))
 
     headers = ["N", "Prix Tree", "Prix BS", "(Tree - BS) × NbSteps"]
     start_col = "V"
@@ -41,6 +41,7 @@ def outil_convergence_excel():
 
     sheet_cv.range(f"{start_col}{start_row}:Y{start_row}").value = headers
     sheet_cv.range(f"{start_col}{start_row}:Y{start_row}").font.bold = True
+    sheet_cv.range(f"{start_col}{data_start_row}:AB{end_row}").value = None
 
     data = []
     for n in N_values:
@@ -55,7 +56,7 @@ def outil_convergence_excel():
 
     width, height = 600, 400
     top_start = 90
-    left_start = 1650
+    left_start = 1700
     vertical_gap = height + 50
     horizontal_gap = width + 50
 
@@ -92,6 +93,7 @@ def run_cv():
         outil_convergence_excel()
     else: 
         pass
+        print("On ne peut pas faire le test de convergence avec l'option américaine ou l'option avec dividendes")
 
 if __name__ == "__main__":
     run_cv()
