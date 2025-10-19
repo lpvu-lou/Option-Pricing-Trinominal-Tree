@@ -17,14 +17,14 @@ def input_parameters():
     Retourne les objets nécessaires pour le pricing.
     """
     # Récupérer le chemin du répertoire courant
-    #base_path = os.path.dirname(os.path.abspath(__file__))
-    #excel_path = os.path.join(base_path, "TrinomialAndBS_Pricer_V2.xlsm")
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    excel_path = os.path.join(base_path, "TrinomialAndBS_Pricer_V2.xlsm")
     
-    #wb = xw.Book(excel_path)
-    #sheet = wb.sheets['Paramètres']
+    wb = xw.Book(excel_path)
+    sheet = wb.sheets['Paramètres']
 
-    wb = xw.Book('/Users/lanphuongvu/Downloads/Option-Pricing-main 2/TrinomialAndBS_Pricer_V2.xlsm')
-    sheet = wb.sheets['Param']
+    #wb = xw.Book('/Users/lanphuongvu/Downloads/Option-Pricing-main 2/TrinomialAndBS_Pricer_V2.xlsm')
+    #sheet = wb.sheets['Param']
 
     # Paramètres du marché
     S0 = float(sheet.range('Spot').value)
