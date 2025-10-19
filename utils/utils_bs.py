@@ -2,7 +2,9 @@ import math
 from scipy.stats import norm
 
 def bs_price(S, K, r, sigma, T, is_call=True):
-    """Calcul du prix de l’option par la formule de Black-Scholes"""
+    """
+    Calcul du prix de l’option par la formule de Black-Scholes
+    """
     if T <= 0:
         return max(0.0, S - K) if is_call else max(0.0, K - S)
     

@@ -15,24 +15,24 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 def outil_convergence_excel():
+    """
+    Crée un test de convergence entre le prix du modèle trinomial et le modèle Black-Scholes.
+    Écrit les résultats dans la feuille Excel 'Test Convergence' et trace deux graphiques :
+    1. Tree vs BS
+    2. (Tree - BS) x NbSteps
+    """
     (market, option, N, exercise, method, optimize, threshold,
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
      S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
     
-    # Si la feuille n'existe pas, la créer
-    if "Test Convergence" not in [sh.name for sh in wb.sheets]:
-        wb.sheets.add("Test Convergence")
-    sheet_cv = wb.sheets['Test Convergence']
+    sheet_cv = wb.sheets("Test Convergence")
 
-    # Nettoyage de la feuille
-    for chart in sheet_cv.charts:
-        chart.delete()
-
-    # Calcul des prix et erreurs
+     # Prix de référence Black-Scholes
     bs_val, _ = black_scholes_price(S0, K, r, sigma, T, is_call)
-    
-    N_values = list(range(1, N+1))
 
+    N_values = list(range(1, N + 1))
+
+    # En-têtes et configuration
     headers = ["N", "Prix Tree", "Prix BS", "(Tree - BS) × NbSteps"]
     start_col = "V"
     start_row = 5
@@ -43,6 +43,7 @@ def outil_convergence_excel():
     sheet_cv.range(f"{start_col}{start_row}:Y{start_row}").font.bold = True
     sheet_cv.range(f"{start_col}{data_start_row}:AB{end_row}").value = None
 
+    # Calcul des prix Tree et erreurs
     data = []
     for n in N_values:
         if method == "Backward":
@@ -52,8 +53,10 @@ def outil_convergence_excel():
 
         data.append([n, price, bs_val, (price - bs_val) * n])
 
+    # Écriture des données
     sheet_cv.range(f"{start_col}{data_start_row}").value = data
 
+    # Création des graphiques
     width, height = 600, 400
     top_start = 90
     left_start = 1700
@@ -85,15 +88,22 @@ def outil_convergence_excel():
     sheet_cv.autofit()
 
 def run_cv():
+    """
+    Vérifie si les conditions permettent de lancer le test de convergence.
+    """
     (market, option, N, exercise, method, optimize, threshold,
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
      S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
     
+    sheet_cv = wb.sheets("Test Convergence")
+    for chart in sheet_cv.charts:
+        chart.delete()
+    sheet_cv.range("A5:ZZ1048576").clear_contents()
+
     if (not exdivdate) and (exercise == "european"):
         outil_convergence_excel()
     else: 
         pass
-        print("On ne peut pas faire le test de convergence avec l'option américaine ou l'option avec dividendes")
 
 if __name__ == "__main__":
     run_cv()

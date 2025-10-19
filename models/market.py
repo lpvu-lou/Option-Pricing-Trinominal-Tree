@@ -2,14 +2,12 @@ import math
 import datetime as dt
 class DividendPolicy:
     """
-    Modèle de dividende discret :
-    Le montant du dividende dépend du prix du sous-jacent S et du temps écoulé depuis t0.
-    t0 doit être un float (temps en années).
+    Modèle de dividende discret
     """
 
     def __init__(self, rho: float, lam: float, t0: float = 0.0):
         """
-        rho : taux de dividende (proportion)
+        rho : taux de dividende 
         lam : taux de décroissance exponentielle
         t0  : référence temporelle (en années, généralement 0.0)
         """
@@ -19,8 +17,7 @@ class DividendPolicy:
 
     def amount(self, t: float, S: float, S0: float) -> float:
         """
-        Calcule le montant du dividende à la date t (en années) :
-        D(t) = ρ * [ S0 * exp(-λΔt) + S * (1 - exp(-λΔt)) ]
+        Calcule le montant du dividende à la date t
         """
         return self.rho * (S0 * math.exp(-self.lam * (t - self.t0)) + S * (1 - math.exp(-self.lam * (t - self.t0))))
 
@@ -31,7 +28,7 @@ class Market:
     Toutes les dates (pricing, ex-div) sont déjà exprimées en années.
     """
 
-    def __init__(self, S0, r, sigma, T,
+    def __init__(self, S0: float, r: float, sigma: float, T: float,
                  dividends=None,
                  exdivdate=None,
                  pricing_date=None,
@@ -62,12 +59,13 @@ class Market:
         else:
             self.dividends = []
 
-    def forward_price(self, dt_step: float) -> float:
-        """Prix à terme du sous-jacent à l’instant t + dt."""
-        return self.S0 * math.exp(self.r * dt_step)
-
     def dividend_on_step(self, t_i: float, t_ip1: float, S: float) -> float:
-        """Somme des dividendes survenant entre t_i et t_{i+1}."""
+        """
+        Somme des dividendes survenant entre t_i et t_{i+1}
+        """
+        if not self.dividends:
+            return 0.0
+        
         tol = (t_ip1 - t_i) / 1000.0
         total_div = 0.0
 
@@ -78,7 +76,9 @@ class Market:
         return total_div
 
     def has_dividend_between(self, t_i: float, t_ip1: float) -> bool:
-        """Vérifie s’il y a un dividende entre t_i et t_{i+1}."""
+        """
+        Vérifie s’il y a un dividende entre t_i et t_{i+1}
+        """
         tol = (t_ip1 - t_i) / 1000.0
         return any(t_i < t_div <= t_ip1 + tol for t_div, _ in self.dividends)
 

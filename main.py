@@ -1,201 +1,93 @@
-# Recuperer des donnees dans un Excel et utiliser ces donnees pour faire des calculs en utilisant xlwings
+import numpy as np
 import xlwings as xw
+import string
 from models.market import Market
 from models.option_trade import Option
-from models.tree import TrinomialTree
-import math
-import numpy as np
-from utils.utils_bs import bs_price
-from models.node import Node
-import time
-import datetime as dt
-import warnings
-warnings.filterwarnings("ignore", category=RuntimeWarning)
+from core_pricer import backward_pricing
 
-from dataclasses import dataclass
-from typing import Optional, Literal
+def outil_am_vs_eu_excel():
 
-# Connexion à l’Excel
-wb = xw.Book('/Users/lanphuongvu/Downloads/Option-Pricing-main/TrinomialAndBS_Pricer_V2.xlsm')
-sheet = wb.sheets['Paramètres']
+    wb = xw.Book('/Users/lanphuongvu/Downloads/Option-Pricing-main 2/TrinomialAndBS_Pricer_V2.xlsm')
+    sheet_name = "Am_vs_Eu_Test"
+    sh = wb.sheets(sheet_name)
 
-# Lire les paramètres du marché@dataclass
-@dataclass
-class Inputs:
-    # Marché
-    spot: float
-    vol: float
-    rate: float
-    div: float
-    div_ex_date: dt.datetime
+    # === PARAMETERS ===
+    S0 = 100
+    T = 1.0
+    sigma = 0.2
+    rates = [-0.01, 0.0, 0.01, 0.05]
+    N = 200
+    strikes = np.linspace(60, 140, 17)
 
-    # Option
-    strike: float
-    maturity: dt.datetime
-    cp: Literal["Call", "Put"]
-    exercise: Literal["EU", "US"]
+    # === STORAGE ===
+    results_call = {r: [] for r in rates}
+    results_put = {r: [] for r in rates}
 
-    # Arbre
-    pricing_date: dt.datetime
-    n_steps: int
-    dt_step: float
-    alpha: float
+    for r in rates:
+        for K in strikes:
+            market = Market(S0=S0, r=r, sigma=sigma, T=T, dividends=[])
+            # Call
+            call_eu = Option(K=K, is_call=True)
+            call_am = Option(K=K, is_call=True)
+            price_eu, _, _ = backward_pricing(market, call_eu, N, exercise="european", optimize=False, threshold = 0)
+            price_am, _, _ = backward_pricing(market, call_am, N, exercise="american", optimize=False, threshold = 0)
+            results_call[r].append(price_am - price_eu)
+            # Put
+            put_eu = Option(K=K, is_call=False)
+            put_am = Option(K=K, is_call=False)
+            price_eu, _, _ = backward_pricing(market, put_eu, N, exercise="european", optimize=False, threshold = 0)
+            price_am, _, _ = backward_pricing(market, put_am, N, exercise="american", optimize=False, threshold = 0)
+            results_put[r].append(price_am - price_eu)
 
-    # Affichages/optim 
-    tree_stock: bool
-    tree_reach: bool
-    tree_option: bool
-    pruning: bool
-    prune_thresh: float
+    # === WRITE RESULTS ===
+    start_row = 2
+    sh.range(f"A{start_row}").value = "Strike"
+    sh.range(f"A{start_row+1}").options(transpose=True).value = strikes
 
-    # Sélection
-    method: Literal["rec", "back"]
-    lang: Literal["py", "vb"]
+    # Letter columns for Excel (B, C, D, ...)
+    letters = list(string.ascii_uppercase)
 
+    for idx, r in enumerate(rates):
+        c1 = letters[1 + idx*2]  # e.g. B, D, F, H
+        c2 = letters[2 + idx*2]  # e.g. C, E, G, I
 
-NR = {
-    # Market
-    "Spot": "Spot",
-    "Vol": "Volatilité",
-    "Rate": "Taux",
-    "Div": "Dividende",
-    "DivDate": "ExDivDate_Dividende",
+        sh.range(f"{c1}1").value = f"r = {r*100:.0f}%"
+        sh.range(f"{c1}{start_row}").value = "Call ΔV"
+        sh.range(f"{c1}{start_row+1}").options(transpose=True).value = results_call[r]
 
-    # Option
-    "Strike": "Strike",
-    "Mat": "Maturité",
-    "CP": "Call_Put",
-    "Ex": "Exercice",
+        sh.range(f"{c2}{start_row}").value = "Put ΔV"
+        sh.range(f"{c2}{start_row+1}").options(transpose=True).value = results_put[r]
 
-    # Tree / divers
-    "PricingDate": "date_pricing",
-    "N": "N",
-    "DeltaT": "Delta_t",
-    "Alpha": "Alpha",
-    "ShowStock": "AffichageStock",
-    "ShowReach": "AffichageReach",
-    "ShowOption": "AffichageOption",
-    "Pruning": "Pruning",
-    "Thresh": "Seuil",
+    # === Summary Table ===
+    summary_row = start_row + len(strikes) + 3
+    sh.range(f"A{summary_row}").value = ["Type", "r(%)", "Mean Premium", "Max Premium"]
+    row = summary_row + 1
+    for r in rates:
+        mean_call = np.mean(results_call[r])
+        mean_put = np.mean(results_put[r])
+        max_call = np.max(results_call[r])
+        max_put = np.max(results_put[r])
+        sh.range(f"A{row}").value = ["Call", r*100, mean_call, max_call]
+        sh.range(f"A{row+1}").value = ["Put", r*100, mean_put, max_put]
+        row += 2
 
-    # Méthode & Langage
-    "Method": "Methode_Pricing",   # B8
-    "Lang": "Langage",             # C8
-
-    # Sorties
-    "PriceTree": "Prix_Tree",
-    "TimeTree": "Time_Tree",
-    "PriceBS": "Prix_BS",
-    "TimeBS": "Time_BS",
-}
-
-def read_inputs(sht: xw.Sheet) -> Inputs:
-    n = sht.book.names
-    v = lambda key: n[NR[key]].refers_to_range.value
-
-    return Inputs(
-        # Marché
-        spot=float(v("Spot")),
-        vol=float(v("Vol")),
-        rate=float(v("Rate")),
-        div=float(v("Div")),
-        div_ex_date=_to_datetime(v("DivDate")),
-
-        # Option
-        strike=float(v("Strike")),
-        maturity=_to_datetime(v("Mat")),
-        cp=_norm_cp(v("CP")),
-        exercise=_norm_ex(v("Ex")),
-
-        # Arbre
-        pricing_date=_to_datetime(v("PricingDate")),
-        n_steps=int(v("N")),
-        dt_step=float(v("DeltaT")),
-        alpha=float(v("Alpha")),
-
-        # Flags
-        show_tree=_as_bool(v("Show")),
-        pruning=_as_bool(v("Pruning")),
-        prune_thresh=float(v("Thresh")),
-
-        # Sélection
-        method=_norm_method(v("Method")),
-        lang=_norm_lang(v("Lang")),
+    # === Simple charts ===
+    call_chart = sh.charts.add(left=500, top=20, width=420, height=280)
+    call_chart.set_source_data(
+        sh.range(f"A{start_row}:{letters[len(rates)*2]}{start_row + len(strikes)}")
     )
+    call_chart.name = "Call Premiums"
+    call_chart.title = "American vs European Premium (Call)"
 
+    put_chart = sh.charts.add(left=500, top=340, width=420, height=280)
+    put_chart.set_source_data(
+        sh.range(f"A{start_row}:{letters[len(rates)*2]}{start_row + len(strikes)}")
+    )
+    put_chart.name = "Put Premiums"
+    put_chart.title = "American vs European Premium (Put)"
 
-def write_outputs(sht: xw.Sheet, price_tree: float, time_tree: float,
-                  price_bs: Optional[float], time_bs: Optional[float]) -> None:
-    n = sht.book.names
-    n[NR["PriceTree"]].refers_to_range.value = float(price_tree)
-    n[NR["TimeTree"]].refers_to_range.value = f"{time_tree:.4f} s"
-    if price_bs is not None:
-        n[NR["PriceBS"]].refers_to_range.value = float(price_bs)
-    if time_bs is not None:
-        n[NR["TimeBS"]].refers_to_range.value = f"{time_bs:.4f} s"
+    sh.range("A1").value = "American vs European Test — No Dividends"
+    sh.autofit()
 
-def build_market(inp: Inputs) -> Market:
-    """Market(S0, r, sigma, T, dividends=None, ...)"""
-    # Sécurise T et N (évite T<=0 avec maturité = date_pricing)
-    days = (inp.maturity - inp.pricing_date).days
-    T_years = max(days, 0) / 365.0
-    return Market(S0=inp.spot, r=inp.rate, sigma=inp.vol, T=T_years, dividends=None)
-
-def build_option(inp: Inputs) -> Option:
-    """Option(K, is_call=True|False)"""
-    return Option(K=inp.strike, is_call=(inp.cp == "Call"))
-
-def build_tree(inp: Inputs, mkt: Market, opt: Option) -> TrinomialTree:
-    """TrinomialTree(market, option, N, exercise="european"/"american")"""
-    exercise = "european" if inp.exercise == "EU" else "american"
-
-    # Sécurise N >= 1
-    N = max(int(inp.n_steps), 1)
-
-    tree = TrinomialTree(market=mkt, option=opt, N=N, exercise=exercise)
-
-    # Certaines versions exigent une étape de construction explicite
-    for method in ("build_tree", "build", "construct_tree", "construct", "init_tree", "initialize"):
-        if hasattr(tree, method):
-            try:
-                getattr(tree, method)()              # sans args
-            except TypeError:
-                try:
-                    getattr(tree, method)(mkt, opt)  # avec args
-                except TypeError:
-                    pass
-            break
-
-    return tree
-
-def run_tree_pricer(inp: Inputs) -> float:
-    mkt = build_market(inp)
-    opt = build_option(inp)
-    tree = build_tree(inp, mkt, opt)
-
-    # Si l’attribut interne 'tree' existe mais est vide, tente une construction tardive
-    lattice = getattr(tree, "tree", None)
-    if lattice is not None and not lattice:
-        for method in ("build_tree", "build", "construct_tree", "construct", "init_tree", "initialize"):
-            if hasattr(tree, method):
-                try:
-                    getattr(tree, method)()
-                except TypeError:
-                    try:
-                        getattr(tree, method)(mkt, opt)
-                    except TypeError:
-                        pass
-                break
-
-    if inp.method == "rec" and hasattr(tree, "price_recursive"):
-        return tree.price_recursive()
-    else:
-        return tree.price_backward()
-
-
-def run_bs_pricer(inp: Inputs) -> Optional[float]:
-    if inp.exercise != "EU":
-        return None
-    T_years = max((inp.maturity - inp.pricing_date).days, 0) / 365.0
-    return bs_price(S=inp.spot, K=inp.strike, r=inp.rate, sigma=inp.vol,
-                    T=T_years, is_call=(inp.cp == "Call"))
+if __name__ == "__main__":
+    outil_am_vs_eu_excel()
