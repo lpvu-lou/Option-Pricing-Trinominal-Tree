@@ -4,15 +4,12 @@ from models.dividend import DividendPolicy
 
 class Market:
     """
-    Paramètres du marché et calendrier des dividendes discrets.
-    Toutes les dates (pricing, ex-div) sont déjà exprimées en années.
+    Paramètres du marché et calendrier des dividendes.
     """
 
     def __init__(self, S0: float, r: float, sigma: float, T: float,
-                 dividends=None,
-                 exdivdate=None,
-                 pricing_date=None,
-                 rho=0.0, lam=0.0):
+                 dividends=None,exdivdate=None,
+                 pricing_date=None,rho=0.0, lam=0.0):
         
         self.S0 = S0
         self.r = r
