@@ -10,7 +10,7 @@ from utils.utils_bs import bs_price
 from models.tree import TrinomialTree
 from models.market import Market
 from models.option_trade import Option
-from core_pricer import input_parameters, backward_pricing, recursive_pricing, black_scholes_price
+from core_pricer import input_parameters, run_backward_pricing, run_recursive_pricing, run_black_scholes
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
@@ -28,7 +28,7 @@ def outil_convergence_excel():
     sheet_cv = wb.sheets("Test Convergence")
 
      # Prix de référence Black-Scholes
-    bs_val, _ = black_scholes_price(S0, K, r, sigma, T, is_call)
+    bs_val, _ = run_black_scholes(S0, K, r, sigma, T, is_call)
 
     N_values = list(range(1, N + 1))
 
@@ -47,9 +47,9 @@ def outil_convergence_excel():
     data = []
     for n in N_values:
         if method == "Backward":
-            price, _, _ = backward_pricing(market, option, n, exercise, optimize, threshold)
+            price, _, _ = run_backward_pricing(market, option, n, exercise, optimize, threshold)
         else:
-            price, _, _ = recursive_pricing(market, option, N, exercise, optimize, threshold)
+            price, _, _ = run_recursive_pricing(market, option, N, exercise, optimize, threshold)
 
         data.append([n, price, bs_val, (price - bs_val) * n])
 

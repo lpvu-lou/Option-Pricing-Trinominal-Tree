@@ -17,7 +17,7 @@ class TruncNode(Node):
         tree : Référence à l’arbre complet 
         """
         super().__init__(time_index=precNode.time_index + 1 if precNode else 0,
-                         stock_price=price)
+                         spot=price)
         self.precMid = precNode
         self.columnDate = colDate
         self.tree = tree

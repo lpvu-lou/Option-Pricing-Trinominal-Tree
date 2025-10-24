@@ -1,13 +1,13 @@
-import xlwings as xw
 import os
 import time
-import math
-import numpy as np
+import xlwings as xw
 import datetime as dt
 
 from models.market import Market
 from models.option_trade import Option
 from models.tree import TrinomialTree
+from models.backward_pricing import backward_pricing
+from models.recursive_pricing import recursive_pricing
 from utils.utils_bs import bs_price
 from utils.utils_date import datetime_to_years
 
@@ -23,8 +23,8 @@ def input_parameters():
     wb = xw.Book(excel_path)
     sheet = wb.sheets['Paramètres']
 
-    #wb = xw.Book('/Users/lanphuongvu/Downloads/Option-Pricing-main 2/TrinomialAndBS_Pricer_V2.xlsm')
-    #sheet = wb.sheets['Param']
+    wb = xw.Book('/Users/lanphuongvu/Downloads/TrinomialAndBS_Pricer.xlsm')
+    sheet = wb.sheets['Param']
 
     # Paramètres du marché
     S0 = float(sheet.range('Spot').value)
@@ -75,38 +75,38 @@ def input_parameters():
             arbre_stock, arbre_proba, arbre_option, wb, sheet,
             S0, K, r, sigma, T, is_call, exdivdate)
 
-def backward_pricing(market, option, N, exercise, optimize, threshold):
-    """
-    Calcule le prix de l’option par la méthode backward.
-    """
+def run_backward_pricing(market, option, N, exercise, optimize, threshold):
+    """Calcule le prix de l’option via la méthode backward"""
     start = time.time()
-    tree = TrinomialTree(market, option, N, exercise)
-    tree.build_tree()
-    tree.compute_reach_probabilities()
-    if optimize == "Oui":
-        tree.prune_tree(threshold)
-    tree.price_backward()
-    elapsed = time.time() - start
-    return tree.tree[0][0].option_value, elapsed, tree
 
-def recursive_pricing(market, option, N, exercise, optimize, threshold):
-    """
-    Calcule le prix de l’option par la méthode récursive.
-    """
-    start = time.time()
     tree = TrinomialTree(market, option, N, exercise)
     tree.build_tree()
     tree.compute_reach_probabilities()
+
     if optimize == "Oui":
-        tree.prune_tree(threshold)
-    price = tree.price_recursive()
+        tree.pruned_tree(threshold)
+
+    price = backward_pricing(tree)
     elapsed = time.time() - start
     return price, elapsed, tree
 
-def black_scholes_price(S0, K, r, sigma, T, is_call):
-    """
-    Prix Black-Scholes (sans dividendes)
-    """
+def run_recursive_pricing(market, option, N, exercise, optimize, threshold):
+    """Calcule le prix de l’option via la méthode récursive"""
+    start = time.time()
+
+    tree = TrinomialTree(market, option, N, exercise)
+    tree.build_tree()
+    tree.compute_reach_probabilities()
+
+    if optimize == "Oui":
+        tree.pruned_tree(threshold)
+
+    price = recursive_pricing(tree)
+    elapsed = time.time() - start
+    return price, elapsed, tree
+
+def run_black_scholes(S0, K, r, sigma, T, is_call):
+    """Calcule le prix Black-Scholes sans dividendes"""
     start = time.time()
     price = bs_price(S0, K, r, sigma, T, is_call)
     elapsed = time.time() - start
@@ -123,13 +123,13 @@ def run_pricer():
 
     # Sélection de la méthode de pricing
     if method == "Backward":
-        price, elapsed, tree = backward_pricing(market, option, N, exercise, optimize, threshold)
+        price, elapsed, tree = run_backward_pricing(market, option, N, exercise, optimize, threshold)
     else:
-        price, elapsed, tree = recursive_pricing(market, option, N, exercise, optimize, threshold)
+        price, elapsed, tree = run_recursive_pricing(market, option, N, exercise, optimize, threshold)
 
     # Calcul du prix Black-Scholes (si pas de dividendes et option européenne)
     if (not exdivdate) and (exercise == "european"):
-        bs_val, bs_time = black_scholes_price(S0, K, r, sigma, T, is_call)
+        bs_val, bs_time = run_black_scholes(S0, K, r, sigma, T, is_call)
     else:
         bs_val, bs_time = None, None
 

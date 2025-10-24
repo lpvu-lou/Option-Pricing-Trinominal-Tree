@@ -13,9 +13,9 @@ from models.market import Market
 from models.option_trade import Option
 from core_pricer import (
     input_parameters,
-    backward_pricing,
-    recursive_pricing,
-    black_scholes_price
+    run_backward_pricing,
+    run_recursive_pricing,
+    run_black_scholes
 )
 
 def outil_vitesse_excel():
@@ -56,12 +56,12 @@ def outil_vitesse_excel():
     # Boucle principale : mesures de temps
     for n in N_values:
         # Sans pruning
-        _, temps_bp_s, _ = backward_pricing(market, option, n, exercise, False, threshold)
-        _, temps_rec_s, _ = recursive_pricing(market, option, n, exercise, False, threshold)
+        _, temps_bp_s, _ = run_backward_pricing(market, option, n, exercise, False, threshold)
+        _, temps_rec_s, _ = run_recursive_pricing(market, option, n, exercise, False, threshold)
 
         # Avec pruning
-        _, temps_bp_av, _ = backward_pricing(market, option, n, exercise, True, threshold)
-        _, temps_rec_av, _ = recursive_pricing(market, option, n, exercise, True, threshold)
+        _, temps_bp_av, _ = run_backward_pricing(market, option, n, exercise, True, threshold)
+        _, temps_rec_av, _ = run_recursive_pricing(market, option, n, exercise, True, threshold)
 
         # Écriture dans Excel
         row = start_row + n

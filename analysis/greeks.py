@@ -10,18 +10,17 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from core_pricer import (
     input_parameters,
-    backward_pricing,
-    recursive_pricing,
-    black_scholes_price
+    run_backward_pricing,
+    run_recursive_pricing,
 )
-from utils.utils_bs import bs_price
+from utils.utils_bs import bs_price, bs_greeks
 from utils.utils_grecs import OneDimDerivative
 
 def get_price(market, option, N, exercise, optimize, threshold, method):
     """
     Retourne le prix de l’option selon la méthode choisie 
     """
-    pricing_fn = backward_pricing if method.lower() == "backward" else recursive_pricing
+    pricing_fn = run_backward_pricing if method.lower() == "backward" else run_recursive_pricing
     price, _, _ = pricing_fn(market, option, N, exercise, optimize, threshold)
     return price
 
@@ -40,113 +39,82 @@ def greek_wrapper(params, x: float) -> float:
 def finite_diff_2d(market, option, N, exercise, optimize, threshold, method, base_price,
                    hS=None, hSigma=None):
     """
-    Calcule les grecs de second ordre croisés :
-    - Vanna : dérivée croisée ∂²V/∂S∂σ
-    - Vomma : dérivée seconde ∂²V/∂σ²
+    Calcule Vanna et Vomma avec stabilité numérique.
+    - Vanna = ∂²V / ∂S∂σ
+    - Vomma = ∂²V / ∂σ²
     """
     S0, sigma0 = market.S0, market.sigma
 
-    # Définit les incréments 
-    hS = hS or 0.01      # Bump de 1% du sous-jacent
-    hSigma = hSigma      # Bump absolu de volatilité
+    # Choix de bumps stables
+    hS = hS or max(1e-4, 0.01 * S0)      # 1% du sous-jacent
+    hSigma = hSigma or max(1e-4, 0.005)  # 0.5% absolu sur sigma
 
-    # Fonction interne pour recalculer le prix avec des shifts donnés
-    def price_with_shifts(S_shift=0.0, sigma_shift=0.0):
+    def price_shift(S_shift=0.0, sigma_shift=0.0):
         m = copy.deepcopy(market)
         m.S0 = S0 + S_shift
-        m.sigma = sigma0 + sigma_shift
-        return get_price(m, option, N, exercise, optimize, threshold, method)
+        m.sigma = max(1e-6, sigma0 + sigma_shift)  # éviter σ négative
+        return float(get_price(m, option, N, exercise, optimize, threshold, method))
 
-    # Vanna
-    p_up_up     = price_with_shifts(+hS, +hSigma)
-    p_up_down   = price_with_shifts(+hS, -hSigma)
-    p_down_up   = price_with_shifts(-hS, +hSigma)
-    p_down_down = price_with_shifts(-hS, -hSigma)
+    # --- Vanna (∂²V / ∂S∂σ)
+    p_up_up     = price_shift(+hS, +hSigma)
+    p_up_down   = price_shift(+hS, -hSigma)
+    p_down_up   = price_shift(-hS, +hSigma)
+    p_down_down = price_shift(-hS, -hSigma)
     vanna = (p_up_up - p_up_down - p_down_up + p_down_down) / (4.0 * hS * hSigma)
 
-    # Vomma
-    p_sig_up   = price_with_shifts(0.0, +hSigma)
-    p_sig_down = price_with_shifts(0.0, -hSigma)
+    # --- Vomma (∂²V / ∂σ²)
+    p_sig_up   = price_shift(0.0, +hSigma)
+    p_sig_down = price_shift(0.0, -hSigma)
     vomma = (p_sig_up - 2.0 * base_price + p_sig_down) / (hSigma ** 2)
 
-    return vanna, vomma
+    # Protection contre les NaN / inf
+    if not np.isfinite(vomma):
+        vomma = 0.0
+    if not np.isfinite(vanna):
+        vanna = 0.0
+
+    return float(vanna), float(vomma)
 
 def compute_method_greeks(market, option, N, exercise, optimize, threshold, method):
     """
-    Calcule les grecs d’une méthode donnée (Backward / Recursive) via différences finies
+    Calcule les grecs pour une méthode donnée (Backward / Recursive)
+    avec corrections Gamma/Vomma.
     """
-    base_price = get_price(market, option, N, exercise, optimize, threshold, method)
+    base_price = float(get_price(market, option, N, exercise, optimize, threshold, method))
 
-    # Définition des pas de variation (scale-aware)
-    hS = max(1e-4, 0.01 * market.S0)   # 1% du sous-jacent
-    hSigma = 1e-3                      # 0.1% de volatilité
-    hR = 1e-4                          # 1 bp
-    hT = 1.0 / 365.0                   # 1 jour
+    # Bumps
+    hS = max(1e-4, 0.01 * market.S0)
+    hSigma = max(1e-4, 0.005)
+    hR = 1e-4
+    hT = 1.0 / 365.0
 
+    # Dérivées 1D
     dS = OneDimDerivative(greek_wrapper, (market, option, N, exercise, optimize, threshold, "S0", method), shift=hS)
     dSigma = OneDimDerivative(greek_wrapper, (market, option, N, exercise, optimize, threshold, "sigma", method), shift=hSigma)
     dRho = OneDimDerivative(greek_wrapper, (market, option, N, exercise, optimize, threshold, "r", method), shift=hR)
     dTheta = OneDimDerivative(greek_wrapper, (market, option, N, exercise, optimize, threshold, "T", method), shift=hT)
 
-    # Calculs des dérivées
+    # Grecs primaires et secondaires
     Delta = dS.first(market.S0)
     Gamma = dS.second(market.S0)
     Vega  = dSigma.first(market.sigma)
     Rho   = dRho.first(market.r)
     Theta = -dTheta.first(market.T)
-    Vanna, Vomma = finite_diff_2d(market, option, N, exercise, optimize, threshold, method, base_price, hS=hS, hSigma=hSigma)
+
+    Vanna, Vomma = finite_diff_2d(market, option, N, exercise, optimize, threshold, method,
+                                  base_price, hS=hS, hSigma=hSigma)
 
     return {
         "Price": base_price,
-        "Delta": Delta,
-        "Gamma": Gamma,
-        "Vega": Vega,
-        "Theta": Theta,
-        "Rho": Rho,
-        "Vanna": Vanna,
-        "Vomma": Vomma,
+        "Delta": float(Delta),
+        "Gamma": float(Gamma),
+        "Vega": float(Vega),
+        "Theta": float(Theta),
+        "Rho": float(Rho),
+        "Vanna": float(Vanna),
+        "Vomma": float(Vomma),
     }
 
-def bs_greeks(S, K, r, sigma, T, is_call=True) -> Dict[str, float]:
-    """
-    Calcule les grecs selon Black-Scholes
-    """
-    if T <= 0 or sigma <= 0 or S <= 0:
-        return {g: 0.0 for g in ["Price", "Delta", "Gamma", "Vega", "Theta", "Rho", "Vanna", "Vomma"]}
-
-    d1 = (log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * sqrt(T))
-    d2 = d1 - sigma * sqrt(T)
-
-    pdf_d1 = norm.pdf(d1)
-    Nd1, Nd2 = norm.cdf(d1), norm.cdf(d2)
-
-    price = bs_price(S, K, r, sigma, T, is_call)
-
-    if is_call:
-        delta = Nd1
-        theta = -(S * pdf_d1 * sigma) / (2 * sqrt(T)) - r * K * exp(-r * T) * Nd2
-        rho = K * T * exp(-r * T) * Nd2
-    else:
-        Nmd1, Nmd2 = norm.cdf(-d1), norm.cdf(-d2)
-        delta = -Nmd1
-        theta = -(S * pdf_d1 * sigma) / (2 * sqrt(T)) + r * K * exp(-r * T) * Nmd2
-        rho = -K * T * exp(-r * T) * Nmd2
-
-    gamma = pdf_d1 / (S * sigma * sqrt(T))
-    vega = S * pdf_d1 * sqrt(T)
-    vomma = vega * d1 * d2 / sigma
-    vanna = vega * (1.0 - d1 / (sigma * sqrt(T))) / S
-
-    return {
-        "Price": price,
-        "Delta": delta,
-        "Gamma": gamma,
-        "Vega": vega,
-        "Theta": theta,
-        "Rho": rho,
-        "Vanna": vanna,
-        "Vomma": vomma,
-    }
 
 def compute_greeks():
     """
@@ -154,9 +122,8 @@ def compute_greeks():
     Calcule les grecs via les deux méthodes 
     et les compare aux résultats Black-Scholes
     """
-    (market, option, N, exercise, method, optimize, threshold,
-        arbre_stock, arbre_proba, arbre_option, wb, sheet,
-        S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
+
+    (market, option, N, exercise, method, optimize, threshold, arbre_stock, arbre_proba, arbre_option, wb, sheet, S0, K, r, sigma, T, is_call, exdivdate, *_) = input_parameters()
 
     ws = wb.sheets["Greeks"]
 
