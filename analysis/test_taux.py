@@ -13,9 +13,9 @@ from models.market import Market
 from models.option_trade import Option
 from core_pricer import (
     input_parameters,
-    backward_pricing,
-    recursive_pricing,
-    black_scholes_price
+    run_backward_pricing,
+    run_recursive_pricing,
+    run_black_scholes
 )
 
 def rate_test():
@@ -23,13 +23,13 @@ def rate_test():
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
      S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
     
-    r_values = np.linspace(-0.1, 0.1, 20)
+    r_values = np.linspace(-0.1, 0.1, 30)
     bs_prices, tree_prices = [], []
 
     for r_test in r_values:
         market.r = r_test
         bs_p = bs_price(S0, K, r_test, sigma, T, is_call)
-        tree_p, _, _ = backward_pricing(market, option, N, exercise, optimize=False, threshold=threshold)
+        tree_p, _, _ = run_backward_pricing(market, option, N, exercise, optimize=False, threshold=threshold)
         bs_prices.append(bs_p)
         tree_prices.append(tree_p)
 
@@ -43,7 +43,7 @@ def rate_test():
         c.delete()
     sheet_pr.range("O5:AA33").clear_contents()
 
-    headers = ["Strike", "BS", "Tree", "Tree - BS"]
+    headers = ["Taux", "BS", "Tree", "Tree - BS"]
     data = np.column_stack((r_values, bs_prices, tree_prices, diff))
     start_row = 4
     sheet_pr.range(f"O{start_row}").value = headers

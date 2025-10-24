@@ -13,9 +13,9 @@ from models.market import Market
 from models.option_trade import Option
 from core_pricer import (
     input_parameters,
-    backward_pricing,
-    recursive_pricing,
-    black_scholes_price
+    run_backward_pricing,
+    run_recursive_pricing,
+    run_black_scholes
 )
 
 def strike_test():
@@ -35,7 +35,7 @@ def strike_test():
     sheet_pr.range("A4:M33").clear_contents()
 
     # Paramètres pour le test
-    K_values = list(range(int(K-10), int(K+11), 1))
+    K_values = np.linspace(K-5, K+5, 30)
     bs_prices, tree_prices = [], []
 
     # Boucle principale
@@ -48,7 +48,7 @@ def strike_test():
         bs_prices.append(bs_p)
 
         # Prix par arbre trinomial
-        price_tree, _, _ = backward_pricing(market, option, N, exercise, optimize=False, threshold=threshold)
+        price_tree, _, _ = run_backward_pricing(market, option, N, exercise, optimize=False, threshold=threshold)
         tree_prices.append(price_tree)
 
     bs_prices = np.array(bs_prices)
@@ -95,3 +95,4 @@ def run_strike_test():
 
 if __name__ == "__main__":
     run_strike_test()
+    

@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.utils_bs import bs_price
 from core_pricer import (
     input_parameters,
-    backward_pricing
+    run_backward_pricing
 )
 
 def test_vol():
@@ -18,13 +18,13 @@ def test_vol():
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
      S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
 
-    vol_values = np.linspace(0.05, 0.5, 20)
+    vol_values = np.linspace(0.05, 0.5, 30)
     bs_prices, tree_prices = [], []
 
     for vol in vol_values:
         market.sigma = vol
         bs_p = bs_price(S0, K, r, vol, T, is_call)
-        tree_p, _, _ = backward_pricing(market, option, N, exercise, optimize=False, threshold=threshold)
+        tree_p, _, _ = run_backward_pricing(market, option, N, exercise, optimize=False, threshold=threshold)
         bs_prices.append(bs_p)
         tree_prices.append(tree_p)
 

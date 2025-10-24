@@ -11,7 +11,7 @@ def price_recursive(tree, i=0, k=0, _cache=None):
     if i >= tree.N:
         if 0 <= k + i < len(tree.tree[i]):
             node = tree.tree[i][k + i]
-            val = 0.0 if node is None else tree.option.payoff(node.spot)
+            val = 0.0 if node is None else tree.option.payoff(node.stock_price)
         else:
             val = 0.0
         _cache[key] = val
@@ -26,7 +26,7 @@ def price_recursive(tree, i=0, k=0, _cache=None):
         _cache[key] = 0.0
         return 0.0
 
-    S = node.spot
+    S = node.stock_price
     pD, pM, pU, kprime = local_probabilities(tree, i, k, S)
     kprime = max(-(i + 1), min(i + 1, kprime))
 

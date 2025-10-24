@@ -16,7 +16,7 @@ def strike_test():
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
      S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
 
-    K_values = np.linspace(int(0.8 * S0), int(1.2 * S0), 20)
+    K_values = np.linspace(int(0.9 * S0), int(1.1 * S0), 20)
     data = []
 
     for k in K_values:
