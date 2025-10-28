@@ -37,6 +37,14 @@ class TrinomialTree:
             self.trunk[i] = mid_i
             prices = mid_i * (self.alpha ** np.arange(-i, i + 1))
             self.tree.append([Node(i, float(S)) for S in prices])
+        
+        for i, level in enumerate(self.tree[:-1]): 
+            for k, node in enumerate(level):
+                pD, pM, pU, kprime = local_probabilities(self, i, k, node.stock_price)
+                node.p_down = pD
+                node.p_mid = pM
+                node.p_up = pU
+                node.kprime = kprime
 
     def compute_reach_probabilities(self):
         compute_reach_probabilities(self)

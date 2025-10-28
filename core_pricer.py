@@ -10,11 +10,6 @@ from models.pruning import compute_reach_probabilities, prune_tree
 from utils.utils_bs import bs_price
 from utils.utils_date import datetime_to_years
 
-
-# ===============================
-# 1️⃣ PARAMÈTRES D’ENTRÉE EXCEL
-# ===============================
-
 def input_parameters():
     """
     Lit les paramètres du pricer depuis le fichier Excel.
@@ -24,7 +19,7 @@ def input_parameters():
     wb = xw.Book('/Users/lanphuongvu/Downloads/TrinomialAndBS_Pricer.xlsm')
     sheet = wb.sheets['Param']
 
-    # --- Paramètres du marché ---
+    # Paramètres du marché 
     S0 = float(sheet.range('Spot').value)
     r = sheet.range('Taux').value
     sigma = sheet.range('Vol').value
@@ -32,29 +27,28 @@ def input_parameters():
     lam = sheet.range('Lambda').value
     exdiv_raw = sheet.range('ExDivDate_Dividende').value
 
-    # --- Paramètres de l’option ---
+    # Paramètres de l’option
     K = sheet.range('Strike').value
     maturity_date = sheet.range('Maturity').value
     pricing_date = sheet.range('date_pricing').value
     is_call = (sheet.range('Call_Put').value == "Call")
     exercise = "european" if sheet.range('Exercice').value == "EU" else "american"
 
-    # --- Paramètres de l’arbre ---
+    # Paramètres de l’arbre 
     N = int(sheet.range('N').value)
     method = sheet.range('Methode_Pricing').value
     optimize = sheet.range('Pruning').value
     threshold = sheet.range('SeuilPruning').value
 
-    # --- Options d’affichage (facultatif) ---
+    # Options d’affichage 
     arbre_stock = sheet.range('AffichageStock').value
     arbre_proba = sheet.range('AffichageReach').value
     arbre_option = sheet.range('AffichageOption').value
 
-    # --- Conversion des dates ---
+    # Conversion des dates
     T = datetime_to_years(maturity_date, pricing_date)
     exdivdate = datetime_to_years(exdiv_raw, pricing_date)
 
-    # --- Création des objets marché et option ---
     market = Market(
         S0=S0,
         r=r,
@@ -73,29 +67,63 @@ def input_parameters():
             arbre_stock, arbre_proba, arbre_option, wb, sheet,
             S0, K, r, sigma, T, is_call, exdivdate)
 
+from models.probabilities import local_probabilities  # <-- we need this
 
-# ===============================
-# 2️⃣ MÉTHODES DE PRICING
-# ===============================
+
+def attach_local_probabilities(tree):
+    """
+    For every node that still exists in tree.tree (after pruning, etc),
+    compute and store p_down, p_mid, p_up on that node.
+    We skip the last time step because it has no outgoing transitions.
+    """
+    # get levels list (tree.tree in your class)
+    levels = getattr(tree, "levels", getattr(tree, "tree", []))
+    if not levels:
+        return
+
+    # iterate on all but last column
+    for i, level in enumerate(levels[:-1]):
+        for k, node in enumerate(level):
+            # some pruned trees may have 'None' placeholders
+            if node is None:
+                continue
+            # node.stock_price must exist; if it's named differently in Node, adjust here
+            stock_attr = "stock_price"
+            if not hasattr(node, stock_attr):
+                # fallback to "spot" etc. if needed
+                if hasattr(node, "spot"):
+                    stock_attr = "spot"
+                elif hasattr(node, "price"):
+                    stock_attr = "price"
+                else:
+                    # can't compute probs for this node
+                    continue
+
+            S_i_k = getattr(node, stock_attr)
+
+            pD, pM, pU, kprime = local_probabilities(tree, i, k, S_i_k)
+
+            node.p_down = pD
+            node.p_mid = pM
+            node.p_up = pU
+            node.kprime = kprime
+
 
 def run_backward_pricing(market, option, N, exercise, optimize, threshold):
     """Calcule le prix de l’option via la méthode backward"""
     start = time.time()
 
-    # Création et construction de l’arbre
     tree = TrinomialTree(market, option, N, exercise)
     tree.build_tree()
 
-    # Calcul des probabilités d’atteinte (nécessaires pour le pruning)
     compute_reach_probabilities(tree)
 
-    # Pruning (optionnel)
     if optimize == "Oui":
         prune_tree(tree, threshold)
+    
+    attach_local_probabilities(tree)
 
-    # Pricing backward
     price = tree.price_backward()
-
     elapsed = time.time() - start
     return price, elapsed, tree
 
@@ -111,6 +139,8 @@ def run_recursive_pricing(market, option, N, exercise, optimize, threshold):
     if optimize == "Oui":
         prune_tree(tree, threshold)
 
+    attach_local_probabilities(tree)
+    
     price = tree.price_recursive()
     elapsed = time.time() - start
     return price, elapsed, tree
@@ -124,10 +154,6 @@ def run_black_scholes(S0, K, r, sigma, T, is_call):
     return price, elapsed
 
 
-# ===============================
-# 3️⃣ PRICER COMPLET (Excel)
-# ===============================
-
 def run_pricer():
     """
     Exécute le pricer complet selon la méthode choisie (Backward ou Recursive)
@@ -137,13 +163,11 @@ def run_pricer():
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
      S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
 
-    # --- Sélection de la méthode ---
     if method == "Backward":
         price, elapsed, tree = run_backward_pricing(market, option, N, exercise, optimize, threshold)
     else:
         price, elapsed, tree = run_recursive_pricing(market, option, N, exercise, optimize, threshold)
 
-    # --- Calcul Black-Scholes (si applicable) ---
     if (not exdivdate) and (exercise == "european"):
         bs_val, bs_time = run_black_scholes(S0, K, r, sigma, T, is_call)
     else:
