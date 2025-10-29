@@ -12,4 +12,7 @@ class Option:
         """
         Calcule le payoff de l’option à l’échéance en fonction du prix du sous-jacent.
         """
-        return max(S - self.K, 0) if self.is_call else max(self.K - S, 0)
+        if self.is_call:
+            return max(S - self.K, 0)
+        else:
+            return max(self.K - S, 0)

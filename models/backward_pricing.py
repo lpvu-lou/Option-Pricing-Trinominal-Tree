@@ -1,14 +1,19 @@
-from models.probabilities import local_probabilities
-
 def price_backward(tree):
     """
-    Calcul du prix de l’option par récurrence arrière.
+    Calcule le prix de l’option par récurrence arrière.
     """
+
+    option = tree.option
+    df = tree.df
+    is_american = (tree.exercise == "american")
+
+    # Valeur à maturité
     last_level = tree.tree[-1]
     for node in last_level:
         if node is not None:
-            node.option_value = tree.option.payoff(node.stock_price)
+            node.option_value = option.payoff(node.stock_price)
 
+    # Sécurité d'accès pour les nœuds enfants
     def safe_val(level, idx):
         if 0 <= idx < len(level):
             child = level[idx]
@@ -16,22 +21,34 @@ def price_backward(tree):
                 return child.option_value
         return 0.0
 
+    # Récurrence arrière
     for i in range(tree.N - 1, -1, -1):
         next_level = tree.tree[i + 1]
-        for j, node in enumerate(tree.tree[i]):
+        level = tree.tree[i]
+        level_proba = tree.proba_tree[i]  # liste de (pD, pM, pU, kprime)
+
+        for j, node in enumerate(level):
             if node is None:
                 continue
 
+            # Probabilités déjà stockées
+            try:
+                pD, pM, pU, kprime = level_proba[j]
+            except IndexError:
+                continue  # cas rare : taille incohérente après pruning
+
             S = node.stock_price
-            pD, pM, pU, kprime = local_probabilities(tree, i, j - i, S)
             base = kprime + (i + 1)
 
             Vd = safe_val(next_level, base - 1)
             Vm = safe_val(next_level, base)
             Vu = safe_val(next_level, base + 1)
 
-            hold = tree.df * (pD * Vd + pM * Vm + pU * Vu)
-            exer = tree.option.payoff(S)
-            node.option_value = max(hold, exer) if tree.exercise == "american" else hold
+            hold = df * (pD * Vd + pM * Vm + pU * Vu)
+            exer = option.payoff(S)
 
-    return tree.tree[0][0].option_value
+            node.option_value = max(hold, exer) if is_american else hold
+
+    # Retourne la valeur à la racine
+    root = tree.tree[0][0]
+    return root.option_value

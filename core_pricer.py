@@ -67,48 +67,6 @@ def input_parameters():
             arbre_stock, arbre_proba, arbre_option, wb, sheet,
             S0, K, r, sigma, T, is_call, exdivdate)
 
-from models.probabilities import local_probabilities  # <-- we need this
-
-
-def attach_local_probabilities(tree):
-    """
-    For every node that still exists in tree.tree (after pruning, etc),
-    compute and store p_down, p_mid, p_up on that node.
-    We skip the last time step because it has no outgoing transitions.
-    """
-    # get levels list (tree.tree in your class)
-    levels = getattr(tree, "levels", getattr(tree, "tree", []))
-    if not levels:
-        return
-
-    # iterate on all but last column
-    for i, level in enumerate(levels[:-1]):
-        for k, node in enumerate(level):
-            # some pruned trees may have 'None' placeholders
-            if node is None:
-                continue
-            # node.stock_price must exist; if it's named differently in Node, adjust here
-            stock_attr = "stock_price"
-            if not hasattr(node, stock_attr):
-                # fallback to "spot" etc. if needed
-                if hasattr(node, "spot"):
-                    stock_attr = "spot"
-                elif hasattr(node, "price"):
-                    stock_attr = "price"
-                else:
-                    # can't compute probs for this node
-                    continue
-
-            S_i_k = getattr(node, stock_attr)
-
-            pD, pM, pU, kprime = local_probabilities(tree, i, k, S_i_k)
-
-            node.p_down = pD
-            node.p_mid = pM
-            node.p_up = pU
-            node.kprime = kprime
-
-
 def run_backward_pricing(market, option, N, exercise, optimize, threshold):
     """Calcule le prix de l’option via la méthode backward"""
     start = time.time()
@@ -120,8 +78,6 @@ def run_backward_pricing(market, option, N, exercise, optimize, threshold):
 
     if optimize == "Oui":
         prune_tree(tree, threshold)
-    
-    attach_local_probabilities(tree)
 
     price = tree.price_backward()
     elapsed = time.time() - start
@@ -138,8 +94,6 @@ def run_recursive_pricing(market, option, N, exercise, optimize, threshold):
 
     if optimize == "Oui":
         prune_tree(tree, threshold)
-
-    attach_local_probabilities(tree)
     
     price = tree.price_recursive()
     elapsed = time.time() - start

@@ -132,6 +132,5 @@ def run_pricer():
 
     wb.save()
 
-
 if __name__ == '__main__':
     run_pricer()
