@@ -2,9 +2,6 @@ import sys
 import os
 import copy
 import numpy as np
-from math import exp, sqrt, log
-from scipy.stats import norm
-from typing import Dict
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -13,7 +10,7 @@ from core_pricer import (
     run_backward_pricing,
     run_recursive_pricing,
 )
-from utils.utils_bs import bs_price, bs_greeks
+from utils.utils_bs import bs_greeks
 from utils.utils_grecs import OneDimDerivative
 
 def get_price(market, option, N, exercise, optimize, threshold, method):

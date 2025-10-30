@@ -1,20 +1,17 @@
 import math
-import numpy as np
 from models.node import Node
 from models.option_trade import Option
 from models.probabilities import local_probabilities
 from models.pruning import compute_reach_probabilities, prune_tree
 from models.backward_pricing import price_backward
 from models.recursive_pricing import price_recursive
+from utils.utils_dividends import get_dividend_on_step
 from utils.utils_constants import MIN_PRICE
 
 
 class TrinomialTree:
     """
-    Builds and stores:
-      - stock_tree:  nested list of stock prices per node
-      - proba_tree:  nested list of (p_down, p_mid, p_up, kprime) per node
-      - node_tree:   optional nested list of Node objects (if debug_nodes=True)
+    Classe principale pour la construction et le stockage d’un arbre trinomial.
     """
 
     def __init__(self, market, option: Option, N: int, exercise="european"):
@@ -30,37 +27,35 @@ class TrinomialTree:
         self.exp_sig2_dt = math.exp(self.sigma ** 2 * self.dt)
 
         # Structures
-        self.stock_tree = []   # list[list[float]]
-        self.proba_tree = []   # list[list[(pD, pM, pU, kprime)]]
-        self.trunk = [0.0] * (self.N + 1)
-        from models.node import Node
+        self.stock_tree = []    # Arbre des prix du sous-jacent
+        self.proba_tree = []    # Arbre des prix du sous-jacent
+        self.trunk = [0.0] * (self.N + 1)    # # Tronc central : prix médian par niveau
         self.Node = Node
 
-    # ----------------------------------------------------------
-    # Build stock and probability trees (+ optional Node objects)
-    # ----------------------------------------------------------
-    def build_tree(self, debug_nodes: bool = False):
+    def build_tree(self):
         """
-        Builds both stock and probability trees.
-        If debug_nodes=True, also builds a Node-based tree
-        where each Node detects whether a dividend occurs in [t_i, t_{i+1}].
+        Construction de l’arbre des prix du sous-jacent et des probabilités locales
         """
         S0 = self.market.S0
         self.stock_tree = [[S0]]
         self.trunk[0] = S0
 
-        # --- Stock prices per level ---
+        # L'arbre des prix
         for i in range(1, self.N + 1):
             prev_mid = self.trunk[i - 1]
             t_i, t_ip1 = (i - 1) * self.dt, i * self.dt
-            div = self.market.dividend_on_step(t_i, t_ip1, prev_mid)
-            mid_i = max(prev_mid * math.exp(self.r * self.dt) - div, MIN_PRICE)
-            self.trunk[i] = mid_i
 
+            div, _ = get_dividend_on_step(self.market, t_i, t_ip1, prev_mid)
+
+            # Nouveau prix central (on soustrait le dividende s’il est versé)       
+            mid_i = max(prev_mid * math.exp(self.r * self.dt) - div, MIN_PRICE)
+            self.trunk[i] = mid_i 
+
+            # Création des prix de chaque noeud du niveau i
             prices = [float(mid_i * (self.alpha ** k)) for k in range(-i, i + 1)]
             self.stock_tree.append(prices)
 
-        # --- Probabilities per level ---
+        # L'arbre des probabilités
         self.proba_tree = []
         for i, level in enumerate(self.stock_tree[:-1]):
             level_proba = []

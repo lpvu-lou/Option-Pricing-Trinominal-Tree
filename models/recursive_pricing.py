@@ -1,6 +1,6 @@
 import functools
 
-def recursive_cache_timer(show_time=False):
+def recursive_cache_timer():
     """
     Décorateur qui ajoute :
     - un mécanisme de mémoïsation (cache) pour accélérer la récursion
@@ -28,7 +28,7 @@ def recursive_cache_timer(show_time=False):
     return decorator
 
 
-@recursive_cache_timer(show_time=True)
+@recursive_cache_timer()
 def price_recursive(tree, i=0, k=0, _cache=None):
     """
     Fonction de calcul récursif du prix de l’option.

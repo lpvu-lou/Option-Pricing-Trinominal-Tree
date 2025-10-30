@@ -2,7 +2,7 @@ def price_backward(tree):
     """
     Calcule le prix de l’option par récurrence arrière.
     """
-
+    
     option = tree.option
     df = tree.df
     is_american = (tree.exercise == "american")
@@ -13,8 +13,12 @@ def price_backward(tree):
         if node is not None:
             node.option_value = option.payoff(node.stock_price)
 
-    # Sécurité d'accès pour les nœuds enfants
+    # Sécurité d'accès pour les noeuds enfants
     def safe_val(level, idx):
+        """
+        Retourne la valeur de l’enfant si le nœud existe,
+        sinon renvoie 0.0 (cas de pruning ou d’absence de noeud).
+        """
         if 0 <= idx < len(level):
             child = level[idx]
             if child is not None and hasattr(child, "option_value"):
@@ -25,7 +29,7 @@ def price_backward(tree):
     for i in range(tree.N - 1, -1, -1):
         next_level = tree.tree[i + 1]
         level = tree.tree[i]
-        level_proba = tree.proba_tree[i]  # liste de (pD, pM, pU, kprime)
+        level_proba = tree.proba_tree[i]  # noeud supprimé par pruning
 
         for j, node in enumerate(level):
             if node is None:

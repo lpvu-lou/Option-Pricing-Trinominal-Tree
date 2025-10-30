@@ -3,19 +3,13 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
-import xlwings as xw
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils.utils_bs import bs_price
-from models.tree import TrinomialTree
-from models.market import Market
-from models.option_trade import Option
 from core_pricer import (
     input_parameters,
-    run_backward_pricing,
-    run_recursive_pricing,
-    run_black_scholes
+    run_backward_pricing
 )
 
 def strike_test():

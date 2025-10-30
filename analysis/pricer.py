@@ -1,12 +1,10 @@
 import sys
 import os
 import xlwings as xw
-import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from core_pricer import input_parameters, run_pricer as core_run_pricer
-
 
 def display_trees(wb, tree, show_stock, show_reach, show_option, threshold=1e-7):
     """

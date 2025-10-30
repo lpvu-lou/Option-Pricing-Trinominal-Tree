@@ -3,7 +3,6 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
-import xlwings as xw
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 

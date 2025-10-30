@@ -1,12 +1,9 @@
-import os
 import time
 import xlwings as xw
-import datetime as dt
 
 from models.market import Market
 from models.option_trade import Option
 from models.tree import TrinomialTree
-from models.pruning import compute_reach_probabilities, prune_tree
 from utils.utils_bs import bs_price
 from utils.utils_date import datetime_to_years
 
@@ -54,7 +51,6 @@ def input_parameters():
         r=r,
         sigma=sigma,
         T=T,
-        dividends=None,
         exdivdate=exdivdate,
         pricing_date=pricing_date,
         rho=rho,
@@ -73,11 +69,10 @@ def run_backward_pricing(market, option, N, exercise, optimize, threshold):
 
     tree = TrinomialTree(market, option, N, exercise)
     tree.build_tree()
-
-    compute_reach_probabilities(tree)
+    tree.compute_reach_probabilities()
 
     if optimize == "Oui":
-        prune_tree(tree, threshold)
+        tree.prune_tree(threshold)
 
     price = tree.price_backward()
     elapsed = time.time() - start
@@ -90,10 +85,10 @@ def run_recursive_pricing(market, option, N, exercise, optimize, threshold):
 
     tree = TrinomialTree(market, option, N, exercise)
     tree.build_tree()
-    compute_reach_probabilities(tree)
+    tree.compute_reach_probabilities()
 
     if optimize == "Oui":
-        prune_tree(tree, threshold)
+        tree.prune_tree(threshold)
     
     price = tree.price_recursive()
     elapsed = time.time() - start

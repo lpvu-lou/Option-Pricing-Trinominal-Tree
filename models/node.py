@@ -1,4 +1,4 @@
-import math
+from utils.utils_dividends import get_dividend_on_step
 
 class Node:
     """
@@ -52,11 +52,7 @@ class Node:
         t_i = self.time_index * self.tree.dt
         t_ip1 = (self.time_index + 1) * self.tree.dt
 
-        # Boucle sur les dividendes 
-        for t_div, policy in market.dividends:
-            # Si la date du dividende est strictement à l’intérieur de [t_i, t_{i+1})
-            if t_i < t_div < t_ip1 and not self._are_same_times(t_div, t_ip1):
-                self.is_div_in_next_period = True
-                # Calcul du montant du dividende
-                self.div_amount_next = policy.amount(t_div, self.stock_price, market.S0)
-                break
+        div, has_dividend = get_dividend_on_step(market, t_i, t_ip1, self.stock_price)
+        if has_dividend:
+            self.is_div_in_next_period = True
+            self.div_amount_next = div

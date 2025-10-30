@@ -2,14 +2,7 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import time
 import warnings
-import numpy as np
-import xlwings as xw
-from utils.utils_bs import bs_price 
-from models.tree import TrinomialTree
-from models.market import Market
-from models.option_trade import Option
 from core_pricer import input_parameters, run_backward_pricing, run_recursive_pricing, run_black_scholes
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
