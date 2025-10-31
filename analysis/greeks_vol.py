@@ -8,6 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from core_pricer import input_parameters
 from analysis.greeks import compute_method_greeks
 from utils.utils_bs import bs_greeks
+from utils.utils_sheet import ensure_sheet
 
 
 def volatility_test():
@@ -36,7 +37,7 @@ def volatility_test():
     data = [[round(x, 4) if isinstance(x, (float, np.floating)) else x for x in row] for row in data]
 
     sheet_name = "Greeks Vol"
-    sh = wb.sheets[sheet_name] if sheet_name in [s.name for s in wb.sheets] else wb.sheets.add(sheet_name)
+    sh = ensure_sheet(wb, sheet_name)
     for pic in sh.pictures:
         pic.delete()
 

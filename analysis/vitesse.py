@@ -7,6 +7,7 @@ from core_pricer import (
     run_backward_pricing,
     run_recursive_pricing,
 )
+from utils.utils_sheet import ensure_sheet
 
 def outil_vitesse_excel():
     """
@@ -21,9 +22,7 @@ def outil_vitesse_excel():
      S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
     
     # Si la feuille n'existe pas, la créer
-    if "Test Vitesse" not in [sh.name for sh in wb.sheets]:
-        wb.sheets.add("Test Vitesse") 
-    sheet_vt = wb.sheets["Test Vitesse"]
+    sheet_vt = ensure_sheet(wb, "Test Vitesse")
 
     # Nettoyage de la feuille
     for chart in sheet_vt.charts:

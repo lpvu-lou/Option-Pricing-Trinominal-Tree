@@ -13,7 +13,7 @@ def input_parameters():
     Retourne les objets nécessaires pour le pricing.
     """
     # Ouvre le classeur Excel contenant les paramètres
-    wb = xw.Book('/Users/lanphuongvu/Downloads/TrinomialAndBS_Pricer.xlsm')
+    wb = xw.Book('/Users/lanphuongvu/Downloads/TrinomialAndBS_Pricer V3.xlsm')
     sheet = wb.sheets['Param']
 
     # Paramètres du marché 
@@ -39,7 +39,7 @@ def input_parameters():
 
     # Options d’affichage 
     arbre_stock = sheet.range('AffichageStock').value
-    arbre_proba = sheet.range('AffichageReach').value
+    arbre_proba = sheet.range('AffichageProba').value
     arbre_option = sheet.range('AffichageOption').value
 
     # Conversion des dates

@@ -7,6 +7,7 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils.utils_bs import bs_price
+from utils.utils_sheet import ensure_sheet
 from core_pricer import (
     input_parameters,
     run_backward_pricing
@@ -19,9 +20,7 @@ def strike_test():
      S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
     
     # Si la feuille n'existe pas, la créer
-    if "Test Sur Param" not in [sh.name for sh in wb.sheets]:
-        wb.sheets.add("Test Sur Param") 
-    sheet_pr = wb.sheets["Test Sur Param"]
+    sheet_pr = ensure_sheet(wb, "Test Sur Param")
 
     # Nettoyage de la feuille
     for chart in sheet_pr.charts:

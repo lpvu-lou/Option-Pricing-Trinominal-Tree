@@ -5,6 +5,7 @@ import xlwings as xw
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from core_pricer import input_parameters, run_pricer as core_run_pricer
+from utils.utils_sheet import ensure_sheet
 
 def display_trees(wb, tree, show_stock, show_reach, show_option, threshold=1e-7):
     """
@@ -14,13 +15,6 @@ def display_trees(wb, tree, show_stock, show_reach, show_option, threshold=1e-7)
     - Arbre des valeurs d’option
     - Arbres des probabilités locales (p_up, p_mid, p_down) si demandé
     """
-
-    def ensure_sheet(name):
-        """Renvoie la feuille si elle existe, sinon la crée."""
-        try:
-            return wb.sheets[name]
-        except Exception:
-            return wb.sheets.add(name)
 
     def vertical_tree(levels, attr, decimals=6):
         """
@@ -57,28 +51,28 @@ def display_trees(wb, tree, show_stock, show_reach, show_option, threshold=1e-7)
 
     # Arbre du sous-jacent
     if show_stock:
-        sht_stock = ensure_sheet("Arbre Stock")
+        sht_stock = ensure_sheet(wb, "Arbre Stock Price")
         stock_matrix = vertical_tree(levels, "spot", decimals=4)
         write_tree(sht_stock, "Stock Price Tree", stock_matrix)
 
     # Arbre des valeurs d’option 
     if show_option:
-        sht_option = ensure_sheet("Arbre Option")
+        sht_option = ensure_sheet(wb, "Arbre Option")
         option_matrix = vertical_tree(levels, "option_value", decimals=6)
         write_tree(sht_option, "Option Value Tree", option_matrix)
 
     # Arbre des probabilités d’atteinte
     if show_reach:
-        sht_reach = ensure_sheet("Arbre Proba")
+        sht_reach = ensure_sheet(wb, "Arbre Proba")
         reach_matrix = vertical_tree(levels, "p_reach", decimals=10)
         write_tree(sht_reach, "Reach Probability Tree", reach_matrix)
 
         # Probabilités locales (p_up, p_mid, p_down)
         first_node = levels[0][0] if levels and levels[0] else None
         if first_node and hasattr(first_node, "p_up"):
-            sht_pup = ensure_sheet("Arbre p_up")
-            sht_pmid = ensure_sheet("Arbre p_mid")
-            sht_pdown = ensure_sheet("Arbre p_down")
+            sht_pup = ensure_sheet(wb, "Arbre p_up")
+            sht_pmid = ensure_sheet(wb, "Arbre p_mid")
+            sht_pdown = ensure_sheet(wb, "Arbre p_down")
 
             p_up_matrix = vertical_tree(levels, "p_up", decimals=6)
             p_mid_matrix = vertical_tree(levels, "p_mid", decimals=6)
@@ -129,6 +123,3 @@ def run_pricer():
     )
 
     wb.save()
-
-if __name__ == '__main__':
-    run_pricer()

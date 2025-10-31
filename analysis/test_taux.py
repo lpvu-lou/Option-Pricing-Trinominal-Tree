@@ -7,7 +7,7 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils.utils_bs import bs_price
-
+from utils.utils_sheet import ensure_sheet
 from core_pricer import (
     input_parameters,
     run_backward_pricing,
@@ -32,7 +32,7 @@ def rate_test():
     tree_prices = np.array(tree_prices)
     diff = tree_prices - bs_prices
 
-    sheet_pr = wb.sheets["Test Sur Param"]
+    sheet_pr = ensure_sheet(wb, "Test Sur Param")
 
     for c in sheet_pr.charts:
         c.delete()

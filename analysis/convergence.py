@@ -4,6 +4,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import warnings
 from core_pricer import input_parameters, run_backward_pricing, run_recursive_pricing, run_black_scholes
+from utils.utils_sheet import ensure_sheet
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
@@ -18,7 +19,7 @@ def outil_convergence_excel():
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
      S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
     
-    sheet_cv = wb.sheets("Test Convergence")
+    sheet_cv = ensure_sheet(wb, "Test Convergence")
 
      # Prix de référence Black-Scholes
     bs_val, _ = run_black_scholes(S0, K, r, sigma, T, is_call)
