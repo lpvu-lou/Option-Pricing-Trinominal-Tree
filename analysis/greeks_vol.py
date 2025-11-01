@@ -14,7 +14,7 @@ from utils.utils_sheet import ensure_sheet
 def volatility_test():
     (market, option, N, exercise, method, optimize, threshold,
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
-     S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
+     S0, K, r, sigma, T, rho, lam, is_call, exdivdate) = input_parameters()
 
     vol_values = np.linspace(0.05, 0.50, 20)
     data = []
@@ -38,8 +38,6 @@ def volatility_test():
 
     sheet_name = "Greeks Vol"
     sh = ensure_sheet(wb, sheet_name)
-    for pic in sh.pictures:
-        pic.delete()
 
     headers = [
         "Volatility",

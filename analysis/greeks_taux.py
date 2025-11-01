@@ -14,7 +14,7 @@ from utils.utils_sheet import ensure_sheet
 def rate_test():
     (market, option, N, exercise, method, optimize, threshold,
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
-     S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
+     S0, K, r, sigma, T, rho, lam, is_call, exdivdate) = input_parameters()
 
     r_values = np.linspace(-0.1, 0.10, 20)
     data = []
@@ -38,8 +38,6 @@ def rate_test():
 
     sheet_name = "Greeks Rate"
     sh = ensure_sheet(wb, sheet_name)
-    for pic in sh.pictures:
-        pic.delete()
 
     headers = [
         "Interest Rate",

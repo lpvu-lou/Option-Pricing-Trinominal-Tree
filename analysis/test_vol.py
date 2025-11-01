@@ -16,27 +16,26 @@ from core_pricer import (
 def test_vol():
     (market, option, N, exercise, method, optimize, threshold,
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
-     S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
+     S0, K, r, sigma, T, rho, lam, is_call, exdivdate) = input_parameters()
 
+    # Si la feuille n'existe pas, la créer
+    sheet_pr = ensure_sheet(wb, "Test Sur Param")
+    
     vol_values = np.linspace(0.05, 0.5, 30)
     bs_prices, tree_prices = [], []
 
     for vol in vol_values:
         market.sigma = vol
+
         bs_p = bs_price(S0, K, r, vol, T, is_call)
-        tree_p, _, _ = run_backward_pricing(market, option, N, exercise, optimize=False, threshold=threshold)
         bs_prices.append(bs_p)
+        
+        tree_p, _, _ = run_backward_pricing(market, option, N, exercise, optimize=False, threshold=threshold)
         tree_prices.append(tree_p)
 
     bs_prices = np.array(bs_prices)
     tree_prices = np.array(tree_prices)
     diff = tree_prices - bs_prices
-
-    sheet_pr = ensure_sheet(wb, "Test Sur Param")
-
-    for c in sheet_pr.charts:
-        c.delete()
-    sheet_pr.range("A37:M100").clear_contents()
 
     headers = ["Volatility", "BS", "Tree", "Tree - BS"]
     data = np.column_stack((vol_values, bs_prices, tree_prices, diff))
@@ -48,8 +47,8 @@ def test_vol():
 
     ax1.plot(vol_values * 100, bs_prices, color="green", label="BS")
     ax1.plot(vol_values * 100, tree_prices, color="gold", label="Tree")
-    ax1.set_xlabel("Volatility (%)")
-    ax1.set_ylabel("Option price")
+    ax1.set_xlabel("Volatilité (%)")
+    ax1.set_ylabel("Prix d'option")
     ax1.grid(True, alpha=0.3)
 
     ax2 = ax1.twinx()

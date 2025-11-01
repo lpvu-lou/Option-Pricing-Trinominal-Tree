@@ -1,28 +1,30 @@
 import sys
 import os
+import time
 import xlwings as xw
+from numpy import sqrt, exp, pi
+
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from core_pricer import input_parameters, run_pricer as core_run_pricer
 from utils.utils_sheet import ensure_sheet
+from utils.utils_tree_error import tree_error
 
 def display_trees(wb, tree, show_stock, show_reach, show_option, threshold=1e-7):
     """
-    Affiche les différents arbres dans Excel :
-    - Arbre des prix du sous-jacent
-    - Arbre des probabilités d’atteinte
-    - Arbre des valeurs d’option
-    - Arbres des probabilités locales (p_up, p_mid, p_down) si demandé
+    Affiche les arbres (sous-jacent, probas d’atteinte, valeurs d’option, etc.)
+    dans Excel.
     """
 
+    if hasattr(tree, "to_levels_for_excel"):
+        levels = tree.to_levels_for_excel()
+    elif hasattr(tree, "tree"):
+        levels = tree.tree
+    else:
+        raise ValueError("display_trees(): structure d’arbre non reconnue.")
+
     def vertical_tree(levels, attr, decimals=6):
-        """
-        Convertit un arbre en matrice pour affichage dans Excel.
-        - Colonnes = étapes de temps
-        - Lignes = niveaux de nœuds
-        - Masque les valeurs faibles si hide_small=True.
-        """
         n = len(levels)
         matrix = [[""] * n for _ in range(2 * n + 1)]
         center_row = n
@@ -30,58 +32,49 @@ def display_trees(wb, tree, show_stock, show_reach, show_option, threshold=1e-7)
         for i, level in enumerate(levels):
             offset = len(level) // 2
             for j, node in enumerate(level):
-                if not node:
+                if node is None:
                     continue
                 value = getattr(node, attr, None)
                 if value is None:
                     continue
-                val = round(value, decimals)
-                row = center_row - (j - offset)
-                matrix[row][i] = val
+                matrix[center_row - (j - offset)][i] = round(value, decimals)
         return matrix
 
-    def write_tree(sheet, title, matrix):
+    def write_tree(wb, sheet_name, title, matrix):
         """Efface et écrit la matrice dans une feuille Excel."""
-        sheet.clear_contents()
-        sheet.range("A1").value = title
-        sheet.range("A2").value = matrix
-        sheet.range("A:ZZ").columns.autofit()
+        try:
+            sht = ensure_sheet(wb, sheet_name)
+            # Effacement sans clear_contents() pour éviter bug AppleScript
+            sht.range("A:ZZ").value = None
+            time.sleep(0.05)
+            sht.range("A1").value = title
+            sht.range("A2").value = matrix
+            try:
+                sht.range("A:ZZ").columns.autofit()
+            except Exception:
+                pass  # Ignore Mac Excel autofit issues
+        except Exception as e:
+            print(f"[display_trees] Warning: failed to write '{sheet_name}': {e}")
 
-    levels = getattr(tree, "levels", getattr(tree, "tree", []))
-
-    # Arbre du sous-jacent
     if show_stock:
-        sht_stock = ensure_sheet(wb, "Arbre Stock Price")
-        stock_matrix = vertical_tree(levels, "spot", decimals=4)
-        write_tree(sht_stock, "Stock Price Tree", stock_matrix)
+        matrix = vertical_tree(levels, "stock_price", 4)
+        write_tree(wb, "Arbre Stock Price", "Stock Price Tree", matrix)
 
-    # Arbre des valeurs d’option 
     if show_option:
-        sht_option = ensure_sheet(wb, "Arbre Option")
-        option_matrix = vertical_tree(levels, "option_value", decimals=6)
-        write_tree(sht_option, "Option Value Tree", option_matrix)
+        matrix = vertical_tree(levels, "option_value", 6)
+        write_tree(wb, "Arbre Option", "Option Value Tree", matrix)
 
-    # Arbre des probabilités d’atteinte
     if show_reach:
-        sht_reach = ensure_sheet(wb, "Arbre Proba")
-        reach_matrix = vertical_tree(levels, "p_reach", decimals=10)
-        write_tree(sht_reach, "Reach Probability Tree", reach_matrix)
+        matrix = vertical_tree(levels, "p_reach", 10)
+        write_tree(wb, "Arbre Proba", "Reach Probability Tree", matrix)
 
         # Probabilités locales (p_up, p_mid, p_down)
-        first_node = levels[0][0] if levels and levels[0] else None
-        if first_node and hasattr(first_node, "p_up"):
-            sht_pup = ensure_sheet(wb, "Arbre p_up")
-            sht_pmid = ensure_sheet(wb, "Arbre p_mid")
-            sht_pdown = ensure_sheet(wb, "Arbre p_down")
-
-            p_up_matrix = vertical_tree(levels, "p_up", decimals=6)
-            p_mid_matrix = vertical_tree(levels, "p_mid", decimals=6)
-            p_down_matrix = vertical_tree(levels, "p_down", decimals=6)
-
-            write_tree(sht_pup, "Local Probabilities (p_up)", p_up_matrix)
-            write_tree(sht_pmid, "Local Probabilities (p_mid)", p_mid_matrix)
-            write_tree(sht_pdown, "Local Probabilities (p_down)", p_down_matrix)
-
+        first = levels[0][0] if levels and levels[0] else None
+        if first:
+            for name in ("p_up", "p_mid", "p_down"):
+                if hasattr(first, name):
+                    matrix = vertical_tree(levels, name, 6)
+                    write_tree(wb, f"Arbre {name}", f"Local Probabilities ({name})", matrix)
 
 @xw.sub
 def run_pricer():
@@ -91,15 +84,13 @@ def run_pricer():
     - Calcule les prix
     - Affiche les résultats et les arbres
     """
-    # Lecture des paramètres
+    # Lecture des paramètres depuis Excel
     (market, option, N, exercise, method, optimize, threshold,
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
-     S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
+     S0, K, r, sigma, T, rho, lam, is_call, exdivdate) = input_parameters()
 
-    # Calcul du prix
     results = core_run_pricer()
 
-    # Écriture des résultats
     sheet.range('Prix_Tree').value = results['tree_price']
     sheet.range('Prix_Tree').number_format = '0.0000'
 
@@ -112,7 +103,9 @@ def run_pricer():
     sheet.range('Time_BS').value = results['bs_time']
     sheet.range('Time_BS').number_format = '0.000000'
 
-    # Affichage des arbres
+    sheet.range('tree_error').value = tree_error(S0, sigma, r, T, N)
+    sheet.range('tree_error').number_format = '0.0000'
+
     display_trees(
         wb,
         results["tree"],

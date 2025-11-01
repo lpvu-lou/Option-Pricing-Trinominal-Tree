@@ -1,67 +1,84 @@
 import math
-from utils.utils_constants import MIN_PRICE
-from utils.utils_dividends import get_dividend_on_step
-
 
 def compute_reach_probabilities(tree):
     """
-    Calcule et stocke la probabilité d’atteinte (p_reach) de chaque nœud de l’arbre.
+    Calcule et stocke la probabilité d’atteinte (p_reach) de chaque nœud
+    dans un arbre trinomial utilisant des Nodes statiques.
+
+    Hypothèses :
+      - tree.tree est une liste de niveaux [[Node, Node, ...], ...]
+      - Chaque Node possède : p_down, p_mid, p_up
+      - Aucun Node ne référence directement tree
     """
 
-    # Réinitialisation de l’arbre et du tronc central
-    tree.tree = []
+    # --- Étape 1 : réinitialisation ---
+    for level in tree.tree:
+        for node in level:
+            if node is not None:
+                node.p_reach = 0.0
 
-    # Création du noeud racine 
-    root = tree.Node(0, tree.market.S0, tree)
+    # Racine
+    root = tree.tree[0][0]
     root.p_reach = 1.0
-    tree.tree.append([root])
 
-    # Propagation vers l’avant
+    # --- Étape 2 : propagation des probabilités vers l’avant ---
     for i in range(tree.N):
-        prev_level = tree.tree[i]                         # Niveau courant
-        next_level = [None] * (2 * (i + 1) + 1)           # Niveau suivant 
-        mid_next = tree.trunk[i + 1]                      # Prix médian déjà stocké  
+        current_level = tree.tree[i]
+        next_level = tree.tree[i + 1]
+        n_next = len(next_level)
 
-        # Récupération des probabilités locales déjà calculées
-        level_proba = tree.proba_tree[i]
+        for j, node in enumerate(current_level):
+            if node is None or node.p_reach <= 0.0:
+                continue
 
-        for j, node in enumerate(prev_level):
-            if node is None or node.p_reach == 0.0:
-                continue  # Noeud inexistant ou jamais atteint, alors on passe
+            pD, pM, pU = node.p_down, node.p_mid, node.p_up
+            if pD == 0 and pM == 0 and pU == 0:
+                continue
 
-            if j >= len(level_proba):
-                continue  
+            k_rel = j - i  # position relative du nœud dans le niveau i
 
-            # Récupération des probabilités locales pour ce noeud
-            pD, pM, pU, kprime = level_proba[j] 
+            # ---- Propagation individuelle ----
+            if pD > 0:
+                idx_d = k_rel - 1 + (i + 1)
+                if 0 <= idx_d < n_next and next_level[idx_d] is not None:
+                    next_level[idx_d].p_reach += node.p_reach * pD
 
-            # Propagation de la probabilité d’atteinte vers le niveau suivant
-            k = j - i  # position relative par rapport au centre
-            for dj, p in ((-1, pD), (0, pM), (+1, pU)):
-                if p <= 0:
-                    continue  # pas de propagation si probabilité nulle
+            if pM > 0:
+                idx_m = k_rel + (i + 1)
+                if 0 <= idx_m < n_next and next_level[idx_m] is not None:
+                    next_level[idx_m].p_reach += node.p_reach * pM
 
-                knext = k + dj
-                idx = knext + (i + 1)  # position dans le prochain niveau
+            if pU > 0:
+                idx_u = k_rel + 1 + (i + 1)
+                if 0 <= idx_u < n_next and next_level[idx_u] is not None:
+                    next_level[idx_u].p_reach += node.p_reach * pU
 
-                if 0 <= idx < len(next_level):
-                    # Création du nœud enfant si non existant
-                    if next_level[idx] is None:
-                        S_next = tree.trunk[i + 1] * (tree.alpha ** knext)
-                        next_level[idx] = tree.Node(i + 1, S_next)
-
-                    # Mise à jour de la probabilité d’atteinte cumulée
-                    next_level[idx].p_reach += node.p_reach * p
-
-        # Ajout du niveau complet à l’arbre
-        tree.tree.append(next_level)
+    # --- Étape 3 : normalisation (pour éviter dérives d’arrondi) ---
+    total = sum(node.p_reach for node in tree.tree[-1] if node)
+    if total > 0:
+        inv_total = 1.0 / total
+        for level in tree.tree:
+            for node in level:
+                if node is not None:
+                    node.p_reach *= inv_total
 
 
 def prune_tree(tree, threshold=1e-7):
     """
-    Supprime (met à None) les nœuds dont la probabilité d’atteinte p_reach est inférieure à un seuil donné.
+    Supprime (met à None) les nœuds dont la probabilité d’atteinte p_reach
+    est inférieure à un seuil donné.
+
+    Paramètres
+    ----------
+    tree : TrinomialTree
+        Arbre trinomial avec les p_reach déjà calculées.
+    threshold : float
+        Seuil minimal sous lequel un nœud est supprimé.
+    verbose : bool
+        Si True, affiche le nombre de nœuds supprimés.
     """
-    for i, level in enumerate(tree.tree):
+    for level in tree.tree:
         for j, node in enumerate(level):
             if node is not None and node.p_reach < threshold:
-                level[j] = None 
+                level[j] = None
+

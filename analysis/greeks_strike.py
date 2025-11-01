@@ -14,7 +14,7 @@ from utils.utils_sheet import ensure_sheet
 def strike_test():
     (market, option, N, exercise, method, optimize, threshold,
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
-     S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
+     S0, K, r, sigma, T, rho, lam, is_call, exdivdate) = input_parameters()
 
     K_values = np.linspace(int(0.9 * S0), int(1.1 * S0), 20)
     data = []
@@ -38,8 +38,6 @@ def strike_test():
 
     sheet_name = "Greeks Strike"
     sh = ensure_sheet(wb, sheet_name)
-    for pic in sh.pictures:
-        pic.delete()
 
     headers = [
         "Strike",

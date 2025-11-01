@@ -9,7 +9,7 @@ from core_pricer import (
 )
 from utils.utils_sheet import ensure_sheet
 
-def outil_vitesse_excel():
+def run_vt():
     """
     Teste le temps de calcul du modèle trinomial selon le nombre d'étapes N.
     Compare le temps pour :
@@ -19,22 +19,16 @@ def outil_vitesse_excel():
     # Lecture des paramètres depuis Excel
     (market, option, N, exercise, method, optimize, threshold,
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
-     S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
+     S0, K, r, sigma, T, rho, lam, is_call, exdivdate) = input_parameters()
     
     # Si la feuille n'existe pas, la créer
     sheet_vt = ensure_sheet(wb, "Test Vitesse")
-
-    # Nettoyage de la feuille
-    for chart in sheet_vt.charts:
-        chart.delete()
-    sheet_vt.range("A6:ZZ1048576").clear_contents()
 
     # Initialisation des paramètres
     N_values = list(range(1, N+1))
     start_col_sp = "B"   # Sans pruning
     start_col_ap = "V"   # Avec pruning
     start_row = 5
-    data_start_row = start_row + 1
     end_row = start_row + N
 
     # Dimensions des graphiques
@@ -77,13 +71,3 @@ def outil_vitesse_excel():
     chart2.title = "Temps du calcul : Avec Pruning"
 
     sheet_vt.autofit()
-
-def run_vt():
-    (market, option, N, exercise, method, optimize, threshold,
-     arbre_stock, arbre_proba, arbre_option, wb, sheet,
-     S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
-    
-    outil_vitesse_excel()
-
-if __name__ == "__main__":
-    run_vt()

@@ -3,6 +3,9 @@ import os
 import copy
 import numpy as np
 
+# -------------------------------------------------------------------------
+# Import des modules internes
+# -------------------------------------------------------------------------
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from core_pricer import (
@@ -13,19 +16,24 @@ from core_pricer import (
 from utils.utils_bs import bs_greeks
 from utils.utils_grecs import OneDimDerivative
 
+
+# -------------------------------------------------------------------------
+# 1. Fonction générique : récupération du prix selon la méthode
+# -------------------------------------------------------------------------
 def get_price(market, option, N, exercise, optimize, threshold, method):
-    """
-    Retourne le prix de l’option selon la méthode choisie 
-    """
+    """Retourne le prix de l’option selon la méthode choisie."""
     pricing_fn = run_backward_pricing if method.lower() == "backward" else run_recursive_pricing
     price, _, _ = pricing_fn(market, option, N, exercise, optimize, threshold)
-    return price
+    return float(price)
 
 
+# -------------------------------------------------------------------------
+# 2. Wrapper générique pour dérivées numériques
+# -------------------------------------------------------------------------
 def greek_wrapper(params, x: float) -> float:
     """
-    Wrapper : modifie un paramètre de marché pour recalculer le prix.
-    Permet d’utiliser des dérivées numériques de manière générique.
+    Modifie un paramètre de marché pour recalculer le prix.
+    Utilisé pour la dérivation numérique.
     """
     market, option, N, exercise, optimize, threshold, target, method = params
     m = copy.deepcopy(market)
@@ -33,132 +41,132 @@ def greek_wrapper(params, x: float) -> float:
     return get_price(m, option, N, exercise, optimize, threshold, method)
 
 
-def finite_diff_2d(market, option, N, exercise, optimize, threshold, method, base_price,
-                   hS=None, hSigma=None):
+# -------------------------------------------------------------------------
+# 3. Dérivées croisées : Vanna & Vomma
+# -------------------------------------------------------------------------
+def finite_diff_2d(market, option, N, exercise, optimize, threshold, method, base_price):
     """
-    Calcule Vanna et Vomma avec stabilité numérique.
-    - Vanna = ∂²V / ∂S∂σ
-    - Vomma = ∂²V / ∂σ²
+    Calcule Vanna (∂²V / ∂S∂σ) et Vomma (∂²V / ∂σ²) par différences finies centrées.
     """
     S0, sigma0 = market.S0, market.sigma
+    hS = max(1e-5, 0.01 * S0)
+    hSigma = max(1e-5, 0.005)
 
-    # Choix de bumps stables
-    hS = hS or max(1e-4, 0.01 * S0)      # 1% du sous-jacent
-    hSigma = hSigma or max(1e-4, 0.005)  # 0.5% absolu sur sigma
-
-    def price_shift(S_shift=0.0, sigma_shift=0.0):
+    def price_shift(dS=0.0, dSigma=0.0):
         m = copy.deepcopy(market)
-        m.S0 = S0 + S_shift
-        m.sigma = max(1e-6, sigma0 + sigma_shift)  # éviter σ négative
-        return float(get_price(m, option, N, exercise, optimize, threshold, method))
+        m.S0 = S0 + dS
+        m.sigma = max(1e-6, sigma0 + dSigma)
+        return get_price(m, option, N, exercise, optimize, threshold, method)
 
-    # --- Vanna (∂²V / ∂S∂σ)
+    # --- Calcul des dérivées croisées
     p_up_up     = price_shift(+hS, +hSigma)
     p_up_down   = price_shift(+hS, -hSigma)
     p_down_up   = price_shift(-hS, +hSigma)
     p_down_down = price_shift(-hS, -hSigma)
-    vanna = (p_up_up - p_up_down - p_down_up + p_down_down) / (4.0 * hS * hSigma)
 
-    # --- Vomma (∂²V / ∂σ²)
+    vanna = (p_up_up - p_up_down - p_down_up + p_down_down) / (4 * hS * hSigma)
+
+    # --- Calcul de Vomma
     p_sig_up   = price_shift(0.0, +hSigma)
     p_sig_down = price_shift(0.0, -hSigma)
-    vomma = (p_sig_up - 2.0 * base_price + p_sig_down) / (hSigma ** 2)
+    vomma = (p_sig_up - 2 * base_price + p_sig_down) / (hSigma ** 2)
 
-    # Protection contre les NaN / inf
-    if not np.isfinite(vomma):
-        vomma = 0.0
-    if not np.isfinite(vanna):
-        vanna = 0.0
+    # Sécurité numérique
+    if not np.isfinite(vanna): vanna = 0.0
+    if not np.isfinite(vomma): vomma = 0.0
 
     return float(vanna), float(vomma)
 
+
+# -------------------------------------------------------------------------
+# 4. Calcul complet des greeks selon une méthode
+# -------------------------------------------------------------------------
 def compute_method_greeks(market, option, N, exercise, optimize, threshold, method):
     """
-    Calcule les grecs pour une méthode donnée (Backward / Recursive)
-    avec corrections Gamma/Vomma.
+    Calcule les principaux grecs pour une méthode donnée.
     """
-    base_price = float(get_price(market, option, N, exercise, optimize, threshold, method))
+    base_price = get_price(market, option, N, exercise, optimize, threshold, method)
 
-    # Bumps
-    hS = max(1e-4, 0.01 * market.S0)
-    hSigma = max(1e-4, 0.005)
+    # Petits incréments pour dérivées numériques
+    hS = max(1e-5, 0.005 * market.S0)
+    hSigma = max(1e-5, 0.005)
     hR = 1e-4
-    hT = 1.0 / 365.0
+    hT = 1.0 / 365.0  # un jour
 
-    # Dérivées 1D
+    # --- Dérivées simples
     dS = OneDimDerivative(greek_wrapper, (market, option, N, exercise, optimize, threshold, "S0", method), shift=hS)
     dSigma = OneDimDerivative(greek_wrapper, (market, option, N, exercise, optimize, threshold, "sigma", method), shift=hSigma)
-    dRho = OneDimDerivative(greek_wrapper, (market, option, N, exercise, optimize, threshold, "r", method), shift=hR)
-    dTheta = OneDimDerivative(greek_wrapper, (market, option, N, exercise, optimize, threshold, "T", method), shift=hT)
+    dR = OneDimDerivative(greek_wrapper, (market, option, N, exercise, optimize, threshold, "r", method), shift=hR)
+    dT = OneDimDerivative(greek_wrapper, (market, option, N, exercise, optimize, threshold, "T", method), shift=hT)
 
-    # Grecs primaires et secondaires
+    # --- Calcul des grecs
     Delta = dS.first(market.S0)
     Gamma = dS.second(market.S0)
     Vega  = dSigma.first(market.sigma)
-    Rho   = dRho.first(market.r)
-    Theta = -dTheta.first(market.T)
+    Rho   = dR.first(market.r)
+    Theta = -dT.first(market.T)
 
-    Vanna, Vomma = finite_diff_2d(market, option, N, exercise, optimize, threshold, method,
-                                  base_price, hS=hS, hSigma=hSigma)
+    # --- Dérivées croisées
+    Vanna, Vomma = finite_diff_2d(market, option, N, exercise, optimize, threshold, method, base_price)
 
     return {
-        "Price": base_price,
-        "Delta": float(Delta),
-        "Gamma": float(Gamma),
-        "Vega": float(Vega),
-        "Theta": float(Theta),
-        "Rho": float(Rho),
-        "Vanna": float(Vanna),
-        "Vomma": float(Vomma),
+        "Delta": Delta,
+        "Gamma": Gamma,
+        "Vega": Vega,
+        "Theta": Theta,
+        "Rho": Rho,
+        "Vanna": Vanna,
+        "Vomma": Vomma,
     }
 
 
+# -------------------------------------------------------------------------
+# 5. Fonction principale (intégrée à Excel)
+# -------------------------------------------------------------------------
 def compute_greeks():
     """
-    Fonction principale liée à Excel.
-    Calcule les grecs via les deux méthodes 
-    et les compare aux résultats Black-Scholes
+    Calcule les grecs pour les deux méthodes (Backward / Recursive)
+    et les compare à Black-Scholes si applicable.
     """
-
-    (market, option, N, exercise, method, optimize, threshold, arbre_stock, arbre_proba, arbre_option, wb, sheet, S0, K, r, sigma, T, is_call, exdivdate, *_) = input_parameters()
+    (market, option, N, exercise, method, optimize, threshold,
+     arbre_stock, arbre_proba, arbre_option, wb, sheet,
+     S0, K, r, sigma, T, is_call, exdivdate, *_) = input_parameters()
 
     ws = wb.sheets["Greeks"]
 
     # Nettoyage de la feuille
-    for chart in ws.charts:
-        chart.delete()
     ws.range("C6:ZZ1048576").clear_contents()
 
-    # S'il y a dividend ou si l'option est US, on fait pas le calcul de grecs pour Black-Scholes
-    can_use_bs = (not exdivdate) and (exercise == "european")
+    # Vérifie si on peut comparer à BS
+    can_use_bs = (not exdivdate) and (exercise.lower() == "european")
     bs_results = bs_greeks(S0, K, r, sigma, T, is_call) if can_use_bs else None
 
-    # Calcul des grecs pour les deux méthodes de pricing
-    results = {m: compute_method_greeks(market, option, N, exercise, optimize, threshold, m)
-               for m in ["backward", "recursive"]}
+    # Calcul des grecs pour les deux méthodes
+    results = {
+        "recursive": compute_method_greeks(market, option, N, exercise, optimize, threshold, "recursive"),
+        "backward": compute_method_greeks(market, option, N, exercise, optimize, threshold, "backward"),
+    }
 
-    labels = ["Prix d'option", "Delta", "Gamma", "Vega", "Theta", "Rho", "Vanna", "Vomma"]
+    # --- Écriture des résultats dans Excel
+    labels = ["Delta", "Gamma", "Vega", "Theta", "Rho", "Vanna", "Vomma"]
     start_row = 6
     col_bs, col_rec, col_bw = "C", "F", "I"
 
-    for i, label in enumerate(labels):
-        key = label.replace("Prix d'option", "Price")
-
-        # Colonnes Recursive et Backward
+    for i, key in enumerate(labels):
         ws.range(f"{col_rec}{start_row + i}").value = results["recursive"].get(key)
         ws.range(f"{col_bw}{start_row + i}").value = results["backward"].get(key)
-        ws.range(f"{col_rec}{start_row + i}").value = results["recursive"].get(key, None)
-        ws.range(f"{col_bw}{start_row + i}").value = results["backward"].get(key, None)
+        ws.range(f"{col_rec}{start_row + i}:{col_bw}{start_row + i}").number_format = "0.000000"
 
-        # Colonne C (BS) uniquement si condition remplie
         if can_use_bs:
             ws.range(f"{col_bs}{start_row + i}").value = bs_results.get(key)
         else:
             ws.range(f"{col_bs}{start_row + i}").value = None
 
-        ws.range(f"{col_rec}{start_row + i}:{col_bs}{start_row + i}").number_format = "0.000000"
-
     return results
 
+
+# -------------------------------------------------------------------------
+# 6. Exécution directe
+# -------------------------------------------------------------------------
 if __name__ == "__main__":
     compute_greeks()

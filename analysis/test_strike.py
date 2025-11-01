@@ -17,40 +17,27 @@ def strike_test():
     # Lecture des paramètres depuis Excel
     (market, option, N, exercise, method, optimize, threshold,
      arbre_stock, arbre_proba, arbre_option, wb, sheet,
-     S0, K, r, sigma, T, is_call, exdivdate) = input_parameters()
+     S0, K, r, sigma, T, rho, lam, is_call, exdivdate) = input_parameters()
     
     # Si la feuille n'existe pas, la créer
     sheet_pr = ensure_sheet(wb, "Test Sur Param")
-
-    # Nettoyage de la feuille
-    for chart in sheet_pr.charts:
-        chart.delete()
-    sheet_pr.range("A4:M33").clear_contents()
 
     # Paramètres pour le test
     K_values = np.linspace(K-5, K+5, 30)
     bs_prices, tree_prices = [], []
 
-    # Boucle principale
     for k in K_values:
-        # Met à jour le strike
         option.K = k
 
-        # Prix Black-Scholes
         bs_p = bs_price(S0, k, r, sigma, T, is_call)
         bs_prices.append(bs_p)
 
-        # Prix par arbre trinomial
-        price_tree, _, _ = run_backward_pricing(market, option, N, exercise, optimize=False, threshold=threshold)
+        price_tree, _, _ = run_backward_pricing(market, option, N, exercise, optimize, threshold)
         tree_prices.append(price_tree)
 
     bs_prices = np.array(bs_prices)
     tree_prices = np.array(tree_prices)
     diff = tree_prices - bs_prices
-
-    for c in sheet_pr.charts:
-        c.delete()
-    sheet_pr.range("A5:M33").clear_contents()
 
     headers = ["Strike", "BS", "Tree", "Tree - BS"]
     data = np.column_stack((K_values, bs_prices, tree_prices, diff))
@@ -62,8 +49,8 @@ def strike_test():
 
     ax1.plot(K_values, bs_prices, color="green", label="BS")
     ax1.plot(K_values, tree_prices, color="gold", label="Tree")
-    ax1.set_xlabel("Strike (K)")
-    ax1.set_ylabel("Option price")
+    ax1.set_xlabel("Strike")
+    ax1.set_ylabel("Prix d'option")
     ax1.set_xlim(min(K_values) - 1, max(K_values) + 1)
     ax1.grid(True, alpha=0.3)
 
